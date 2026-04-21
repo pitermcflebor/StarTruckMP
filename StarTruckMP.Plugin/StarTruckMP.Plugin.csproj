@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
-    <AssemblyName>StarTruckMP</AssemblyName>
+    <Nullable>enable</Nullable>
     <Description>Star Trucker MP Mod</Description>
     <Version>1.0.0</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -12,81 +12,103 @@
       https://nuget.bepinex.dev/v3/index.json;
       https://nuget.samboy.dev/v3/index.json
     </RestoreAdditionalProjectSources>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <RootNamespace>StarTruckMP</RootNamespace>
+    <PackageId>StarTruckMP.Plugin</PackageId>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="RiptideNetworking.Riptide" Version="2.2.0" />
-  </ItemGroup>
-
-  <ItemGroup>
+    <!-- $(StarTruckBepInEx) = your BepInEx folder inside the games folder -->
     <Reference Include="0Harmony">
-      <HintPath>F:\Games\Others\StarTrucker\BepInEx\core\0Harmony.dll</HintPath>
+      <HintPath>$(StarTruckBepInEx)\core\0Harmony.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Assembly-CSharp">
-      <HintPath>F:\Games\Others\StarTrucker\BepInEx\interop\Assembly-CSharp.dll</HintPath>
+      <HintPath>$(StarTruckBepInEx)\interop\Assembly-CSharp.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="BepInEx.Core">
-      <HintPath>F:\Games\Others\StarTrucker\BepInEx\core\BepInEx.Core.dll</HintPath>
+      <HintPath>$(StarTruckBepInEx)\core\BepInEx.Core.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="BepInEx.Preloader.Core">
-      <HintPath>F:\Games\Others\StarTrucker\BepInEx\core\BepInEx.Preloader.Core.dll</HintPath>
+      <HintPath>$(StarTruckBepInEx)\core\BepInEx.Preloader.Core.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="BepInEx.Unity.Common">
-      <HintPath>F:\Games\Others\StarTrucker\BepInEx\core\BepInEx.Unity.Common.dll</HintPath>
+      <HintPath>$(StarTruckBepInEx)\core\BepInEx.Unity.Common.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="BepInEx.Unity.IL2CPP">
-      <HintPath>F:\Games\Others\StarTrucker\BepInEx\core\BepInEx.Unity.IL2CPP.dll</HintPath>
+      <HintPath>$(StarTruckBepInEx)\core\BepInEx.Unity.IL2CPP.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Il2CppInterop.Runtime">
-      <HintPath>F:\Games\Others\StarTrucker\BepInEx\core\Il2CppInterop.Runtime.dll</HintPath>
+      <HintPath>$(StarTruckBepInEx)\core\Il2CppInterop.Runtime.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Il2Cppmscorlib">
-      <HintPath>F:\Games\Others\StarTrucker\BepInEx\interop\Il2Cppmscorlib.dll</HintPath>
+      <HintPath>$(StarTruckBepInEx)\interop\Il2Cppmscorlib.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Unity.TextMeshPro">
-      <HintPath>F:\Games\Others\StarTrucker\BepInEx\interop\Unity.TextMeshPro.dll</HintPath>
+      <HintPath>$(StarTruckBepInEx)\interop\Unity.TextMeshPro.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine">
-      <HintPath>F:\Games\Others\StarTrucker\BepInEx\interop\UnityEngine.dll</HintPath>
+      <HintPath>$(StarTruckBepInEx)\interop\UnityEngine.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
-      <HintPath>F:\Games\Others\StarTrucker\BepInEx\interop\UnityEngine.CoreModule.dll</HintPath>
+      <HintPath>$(StarTruckBepInEx)\interop\UnityEngine.CoreModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.InputLegacyModule">
-      <HintPath>F:\Games\Others\StarTrucker\BepInEx\interop\UnityEngine.InputLegacyModule.dll</HintPath>
+      <HintPath>$(StarTruckBepInEx)\interop\UnityEngine.InputLegacyModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.InputModule">
-      <HintPath>F:\Games\Others\StarTrucker\BepInEx\interop\UnityEngine.InputModule.dll</HintPath>
+      <HintPath>$(StarTruckBepInEx)\interop\UnityEngine.InputModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.Physics2DModule">
-      <HintPath>F:\Games\Others\StarTrucker\BepInEx\interop\UnityEngine.Physics2DModule.dll</HintPath>
+      <HintPath>$(StarTruckBepInEx)\interop\UnityEngine.Physics2DModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.PhysicsModule">
-      <HintPath>F:\Games\Others\StarTrucker\BepInEx\interop\UnityEngine.PhysicsModule.dll</HintPath>
+      <HintPath>$(StarTruckBepInEx)\interop\UnityEngine.PhysicsModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.TextRenderingModule">
-      <HintPath>F:\Games\Others\StarTrucker\BepInEx\interop\UnityEngine.TextRenderingModule.dll</HintPath>
+      <HintPath>$(StarTruckBepInEx)\interop\UnityEngine.TextRenderingModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.UI">
-      <HintPath>F:\Games\Others\StarTrucker\BepInEx\interop\UnityEngine.UI.dll</HintPath>
+      <HintPath>$(StarTruckBepInEx)\interop\UnityEngine.UI.dll</HintPath>
       <Private>False</Private>
     </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="StarTruckMP.Server\**" />
+    <Compile Remove="StarTruckMP.Shared\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Remove="StarTruckMP.Server\**" />
+    <EmbeddedResource Remove="StarTruckMP.Shared\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="StarTruckMP.Server\**" />
+    <None Remove="StarTruckMP.Shared\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\StarTruckMP.Shared\StarTruckMP.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Collections.Immutable" Version="8.0.0" />
   </ItemGroup>
 </Project>

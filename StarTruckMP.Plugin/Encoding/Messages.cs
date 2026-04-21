@@ -1,20 +1,26 @@
-﻿using Riptide;
+﻿using StarTruckMP.Client;
 using StarTruckMP.Utilities;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using Object = UnityEngine.Object;
 
 namespace StarTruckMP.Encoding
 {
     internal class Messages
     {
-        public static playerInfo createPlayer(ushort playerId, Vector3 position, Vector3 rotation, string sector)
+        public static playerInfo createPlayer(int playerId, Vector3 position, Vector3 rotation, string sector)
         {
-            GameObject sectorGO = GameObject.Find("[Sector]");
-            var myRigid = StarTruckClient.StarTruckClient.myTruck.GetComponent<Rigidbody>();
+            GameObject sectorGo = GameObject.Find("[Sector]");
+            var myTruck = StarTruckClient.MyTruck;
+            var myPlayer = StarTruckClient.MyPlayer;
+            if (myTruck == null || myPlayer == null || StarTruckClient.SpaceSuitObj == null || StarTruckClient.SpaceSuitMats == null)
+                return new playerInfo();
+
+            var myRigid = myTruck.GetComponent<Rigidbody>();
 
             //Spawn new Truck GameObject
             GameObject newTruck = new GameObject("RemoteTruck" + playerId);
-            SceneManager.MoveGameObjectToScene(newTruck, sectorGO.scene);
+            SceneManager.MoveGameObjectToScene(newTruck, sectorGo.scene);
             newTruck.transform.SetParent(null);
             var newRigid = newTruck.AddComponent<Rigidbody>();
             newRigid.useGravity = myRigid.useGravity;
@@ -52,11 +58,11 @@ namespace StarTruckMP.Encoding
 
             //Spawn new Player GameObject
             GameObject newPlayer = new GameObject("RemotePlayer" + playerId);
-            SceneManager.MoveGameObjectToScene(newPlayer, sectorGO.scene);
+            SceneManager.MoveGameObjectToScene(newPlayer, sectorGo.scene);
             newPlayer.transform.SetParent(null);
 
-            GameObject newSuit = GameObject.Instantiate(StarTruckClient.StarTruckClient.spaceSuitObj, Vector3.zero, Quaternion.EulerAngles(Vector3.zero), newPlayer.transform);
-            newSuit.GetComponent<MeshRenderer>().materials = StarTruckClient.StarTruckClient.spaceSuitMats;
+            GameObject newSuit = GameObject.Instantiate(StarTruckClient.SpaceSuitObj, Vector3.zero, Quaternion.EulerAngles(Vector3.zero), newPlayer.transform);
+            newSuit.GetComponent<MeshRenderer>().materials = StarTruckClient.SpaceSuitMats;
             newSuit.active = true;
             newSuit.name = "ClientSuit" + playerId;
             Object.Destroy(newSuit.transform.GetComponent<SpaceSuitController>());
@@ -67,7 +73,7 @@ namespace StarTruckMP.Encoding
             Object.Destroy(newSuit.transform.GetComponent<MaterialSwitcher>());
             Object.Destroy(newSuit.transform.GetComponent<InteractTarget>());
             Object.Destroy(newSuit.transform.GetComponent<DoorController>());
-            myRigid = StarTruckClient.StarTruckClient.myPlayer.GetComponent<Rigidbody>();
+            myRigid = myPlayer.GetComponent<Rigidbody>();
 
             newRigid = newPlayer.AddComponent<Rigidbody>();
             newRigid.useGravity = myRigid.useGravity;
@@ -86,53 +92,29 @@ namespace StarTruckMP.Encoding
             currentPlayer.Player = newPlayer;
             currentPlayer.Truck = newTruck;
             currentPlayer.sector = sector;
+            currentPlayer.truckTrans.Pos = position;
+            currentPlayer.truckTrans.Rot = rotation;
 
             return currentPlayer;
         }
 
-        public static Message createMovementMessage(ushort playerId, Vector3 position, Vector3 rotation, Vector3 velocity, Vector3 angVel, bool isTruck, bool inSeat)
+        public static void updateMovement(GameObject? playerObject, Vector3 position, Vector3 rotation, Vector3 velocity, Vector3 angVel)
         {
-            float[] playerTransform = { position.x, position.y, position.z, rotation.x, rotation.y, rotation.z, velocity.x, velocity.y, velocity.z, angVel.x, angVel.y, angVel.z};
+            var floatingOrigin = StarTruckClient.FloatingOrigin;
+            if (floatingOrigin == null)
+                return;
 
-            Message message = Message.Create(MessageSendMode.Unreliable, (ushort)messageType.movementUpdate);
-            message.AddUShort(playerId);
-            message.AddFloats(playerTransform);
-            message.AddBool(isTruck);
-            message.AddBool(inSeat);
-
-            return message;
-        }
-
-        public static void updateMovement(GameObject playerObject, Vector3 position, Vector3 rotation, Vector3 velocity, Vector3 angVel)
-        {
             if (playerObject != null)
             {
-                playerObject.transform.position = position - StarTruckClient.StarTruckClient.floatingOrigin.m_currentOrigin;
+                playerObject.transform.position = position - floatingOrigin.m_currentOrigin;
                 playerObject.transform.eulerAngles = rotation;
-                playerObject.GetComponent<Rigidbody>().velocity = velocity; 
-                playerObject.GetComponent<Rigidbody>().angularVelocity = angVel; 
-                
+                var rigidbody = playerObject.GetComponent<Rigidbody>();
+                if (rigidbody == null)
+                    return;
+
+                rigidbody.velocity = velocity;
+                rigidbody.angularVelocity = angVel;
             }
         }
-
-        public static Message updateLivery(ushort playerId, string itemId)
-        {
-            Message message = Message.Create(MessageSendMode.Unreliable, (ushort)messageType.updateLivery);
-            message.AddUShort(playerId);
-            message.AddString(itemId);
-
-            return message;
-        }
-
-        public static Message updateSector(ushort playerId, string sector)
-        {
-            Message message = Message.Create(MessageSendMode.Reliable, (ushort)messageType.updateSector);
-            message.AddUShort(playerId);
-            message.AddString(sector);
-
-            return message;
-        }
     }
-
-
 }

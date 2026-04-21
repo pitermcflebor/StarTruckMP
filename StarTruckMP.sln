@@ -3,7 +3,15 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.7.34031.279
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "StarTruckMP", "StarTruckMP.csproj", "{3C7B3E89-91F8-4C01-A561-EF21ACE76C69}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StarTruckMP.Server", "StarTruckMP.Server\StarTruckMP.Server.csproj", "{81377CB9-9638-4228-91F1-D02B100EB7C4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StarTruckMP.Shared", "StarTruckMP.Shared\StarTruckMP.Shared.csproj", "{40303834-9E8E-4634-8760-C578FD01C46C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StarTruckMP.Plugin", "StarTruckMP.Plugin\StarTruckMP.Plugin.csproj", "{C39D3963-CA0A-42A1-B988-3F6ABBDB065E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StarTruckMP.ConnectionProbe", "StarTruckMP.ConnectionProbe\StarTruckMP.ConnectionProbe.csproj", "{7D2D5E2A-72F0-4C1D-9F34-96E76314CF4C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StarTruckMP.FakeClient", "StarTruckMP.FakeClient\StarTruckMP.FakeClient.csproj", "{EDE7FC70-0D05-40BF-B70A-7997CA810247}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +23,26 @@ Global
 		{3C7B3E89-91F8-4C01-A561-EF21ACE76C69}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3C7B3E89-91F8-4C01-A561-EF21ACE76C69}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3C7B3E89-91F8-4C01-A561-EF21ACE76C69}.Release|Any CPU.Build.0 = Release|Any CPU
+		{81377CB9-9638-4228-91F1-D02B100EB7C4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{81377CB9-9638-4228-91F1-D02B100EB7C4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{81377CB9-9638-4228-91F1-D02B100EB7C4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{81377CB9-9638-4228-91F1-D02B100EB7C4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{40303834-9E8E-4634-8760-C578FD01C46C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{40303834-9E8E-4634-8760-C578FD01C46C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{40303834-9E8E-4634-8760-C578FD01C46C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{40303834-9E8E-4634-8760-C578FD01C46C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C39D3963-CA0A-42A1-B988-3F6ABBDB065E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C39D3963-CA0A-42A1-B988-3F6ABBDB065E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C39D3963-CA0A-42A1-B988-3F6ABBDB065E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C39D3963-CA0A-42A1-B988-3F6ABBDB065E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7D2D5E2A-72F0-4C1D-9F34-96E76314CF4C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7D2D5E2A-72F0-4C1D-9F34-96E76314CF4C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7D2D5E2A-72F0-4C1D-9F34-96E76314CF4C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7D2D5E2A-72F0-4C1D-9F34-96E76314CF4C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EDE7FC70-0D05-40BF-B70A-7997CA810247}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EDE7FC70-0D05-40BF-B70A-7997CA810247}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EDE7FC70-0D05-40BF-B70A-7997CA810247}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EDE7FC70-0D05-40BF-B70A-7997CA810247}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

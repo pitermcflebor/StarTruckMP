@@ -1,0 +1,6 @@
+﻿<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Game folder DEBUG" type="DotNetFolderPublish" factoryName="Publish to folder">
+    <riderPublish configuration="Debug" delete_existing_files="true" platform="Any CPU" target_folder="J:/XboxGames/Star Trucker/Content/BepInEx/plugins" target_framework="net6.0" uuid_high="-4351258564215815519" uuid_low="-5077738852209457570" />
+    <method v="2" />
+  </configuration>
+</component>

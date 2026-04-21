@@ -2,16 +2,6 @@
 
 namespace StarTruckMP.Utilities
 {
-    public enum messageType
-    {
-        clientJoin,
-        clientDisconnect,
-        movementUpdate,
-        chatMessage,
-        updateSector,
-        updateLivery
-    }
-
     public struct playerInfo
     {
         public GameObject Player;
@@ -30,9 +20,5 @@ namespace StarTruckMP.Utilities
         public Vector3 Rot;
         public Vector3 Vel;
         public Vector3 AngVel;
-    }
-
-    internal class Utilities
-    {
     }
 }

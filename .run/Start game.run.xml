@@ -1,0 +1,15 @@
+﻿<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Start game" type="RunNativeExe" factoryName="Native Executable">
+    <option name="EXE_PATH" value="J:/XboxGames/Star Trucker/Content/Star Trucker.exe" />
+    <option name="PROGRAM_PARAMETERS" value="" />
+    <option name="WORKING_DIRECTORY" value="J:/XboxGames/Star Trucker/Content" />
+    <option name="PASS_PARENT_ENVS" value="1" />
+    <option name="ENV_FILE_PATHS" value="" />
+    <option name="REDIRECT_INPUT_PATH" value="" />
+    <option name="MIXED_MODE_DEBUG" value="0" />
+    <method v="2">
+      <option name="Build Solution" enabled="true" />
+      <option name="RunConfigurationTask" enabled="true" run_configuration_name="Game folder DEBUG" run_configuration_type="DotNetFolderPublish" />
+    </method>
+  </configuration>
+</component>
