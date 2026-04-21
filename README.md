@@ -12,6 +12,10 @@ For installation instructions check out the [Wiki](https://github.com/JayJay34/S
 > The keybind to connect is the same (left bracket on enlgish keyboards).
 > The server keybind has been replaced with a reconnect keybind.
 
+
+https://github.com/user-attachments/assets/2bc4fdc5-f074-4ecf-b4a9-91405a2f8fd0
+
+
 ## 🌐 Server Hosting
 
 > [!CAUTION]
