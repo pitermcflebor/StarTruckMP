@@ -9,7 +9,7 @@ Please report bugs & issues to the [Issues](https://github.com/pitermcflebor/Sta
 For installation instructions check out the [Wiki](https://github.com/JayJay34/StarTruckerMP/wiki)
 
 > [!TIP]
-> The keybind to connect is the same (left bracket on enlgish keyboards).
+> The keybind to connect is the same (left bracket on english keyboards).
 > The server keybind has been replaced with a reconnect keybind.
 
 
