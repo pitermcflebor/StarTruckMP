@@ -10,6 +10,7 @@
         UpdateSector = 5,
         ProtocolHello = 6,
         ProtocolWelcome = 7,
-        ProtocolMismatch = 8
+        ProtocolMismatch = 8,
+        ProtocolAuthenticate = 9
     }
 }

@@ -6,26 +6,36 @@ namespace StarTruckMP.Server.Server;
 
 public class ServerBackgroundService(ServerManager serverManager) : IHostedService
 {
-    public async Task StartAsync(CancellationToken cancellationToken)
+    private Task? _pollingTask;
+
+    public Task StartAsync(CancellationToken cancellationToken)
     {
         serverManager.Start();
 
-        try
+        // Run the polling loop in a separate Task so StartAsync returns immediately,
+        // allowing Kestrel and the rest of the host to finish starting up.
+        _pollingTask = Task.Run(async () =>
         {
-            while (!cancellationToken.IsCancellationRequested)
+            try
             {
-                serverManager.Polling();
-                await Task.Delay(15, cancellationToken);
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    serverManager.Polling();
+                    await Task.Delay(15, cancellationToken);
+                }
             }
-        }
-        catch (TaskCanceledException)
-        {
-        }
+            catch (TaskCanceledException)
+            {
+            }
+        }, cancellationToken);
+
+        return Task.CompletedTask;
     }
 
-    public Task StopAsync(CancellationToken cancellationToken)
+    public async Task StopAsync(CancellationToken cancellationToken)
     {
         serverManager.Stop();
-        return Task.CompletedTask;
+        if (_pollingTask is not null)
+            await _pollingTask.ConfigureAwait(false);
     }
 }

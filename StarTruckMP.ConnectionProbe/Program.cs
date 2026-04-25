@@ -148,9 +148,8 @@ static void RunContractTests()
 static void AssertRoundTrip<T>(PacketType expectedType, T payload, string error)
 {
     var packet = payload!.Serialize(expectedType);
-    Expect(PacketSerializer.TrySplitPacket(packet, out var actualType, out var actualPayload), "Packet split failed.");
+    Expect(PacketSerializer.TrySplitPacket<T>(packet, out var actualType, out var actualPayload), "Packet split failed.");
     Expect(actualType == expectedType, error + " Unexpected packet type.");
-    _ = PacketSerializer.Deserialize<T>(actualPayload);
 }
 
 static void Expect(bool condition, string message)

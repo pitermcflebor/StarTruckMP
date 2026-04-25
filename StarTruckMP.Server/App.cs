@@ -12,5 +12,5 @@ public static class App
         ReadCommentHandling = JsonCommentHandling.Skip
     };
     
-    public static IServiceProvider ServiceProvider { get; internal set; }
+    public static IServiceProvider ServiceProvider { get; internal set; } = null!;
 }

@@ -14,15 +14,11 @@ namespace StarTruckMP.Shared
             return result;
         }
 
-        public static T Deserialize<T>(byte[] payload)
-        {
-            return MessagePackSerializer.Deserialize<T>(payload);
-        }
+        public static T Deserialize<T>(this byte[] payload) =>
+            MessagePackSerializer.Deserialize<T>(payload);
 
-        public static T Deserialize<T>(ReadOnlySpan<byte> payload)
-        {
-            return MessagePackSerializer.Deserialize<T>(payload.ToArray());
-        }
+        public static T Deserialize<T>(this ReadOnlySpan<byte> payload) =>
+            MessagePackSerializer.Deserialize<T>(payload.ToArray());
 
         public static PacketType ReadPacketType(ReadOnlySpan<byte> packet)
         {
@@ -39,18 +35,19 @@ namespace StarTruckMP.Shared
 
             return packet[1..].ToArray();
         }
-
-        public static bool TrySplitPacket(ReadOnlySpan<byte> packet, out PacketType type, out byte[] payload)
+        
+        public static bool TrySplitPacket<T>(ReadOnlySpan<byte> packet, out PacketType type, out T data)
         {
             if (packet.Length < 1)
             {
                 type = default;
-                payload = [];
+                data = default!;
                 return false;
             }
 
-            type = (PacketType)packet[0];
-            payload = packet.Length > 1 ? packet[1..].ToArray() : [];
+            type = ReadPacketType(packet);
+            var raw = ReadPayload(packet);
+            data = raw.Deserialize<T>();
             return true;
         }
     }

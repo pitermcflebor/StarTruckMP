@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Collections.Concurrent;
 using LiteNetLib;
 using Microsoft.Extensions.Logging;
+using StarTruckMP.Server.Controllers.Services;
 using StarTruckMP.Server.Entities;
 using StarTruckMP.Server.Server.Services;
 using StarTruckMP.Shared;
@@ -22,6 +23,7 @@ public class ServerManager
     private readonly ILogger _logger;
     private readonly ServerSettings _settings;
     private readonly PlayerContainer _playerContainer;
+    private readonly AuthService _authService;
     private readonly ConcurrentQueue<IncomingPacketWorkItem> _incomingPackets = new();
     private readonly ConcurrentQueue<OutgoingSendWorkItem> _outgoingPackets = new();
 
@@ -29,13 +31,14 @@ public class ServerManager
 
     private readonly record struct OutgoingSendWorkItem(byte[] Payload, byte Channel, DeliveryMethod DeliveryMethod, int? TargetPeerId = null, int? ExceptPeerId = null, bool DisconnectTarget = false);
 
-    public ServerManager(ILogger<ServerManager> logger, ServerSettings settings, PlayerContainer playerContainer)
+    public ServerManager(ILogger<ServerManager> logger, ServerSettings settings, PlayerContainer playerContainer, AuthService authService)
     {
         _listener = new EventBasedNetListener();
         _server = new NetManager(_listener);
         _logger = logger;
         _settings = settings;
         _playerContainer = playerContainer;
+        _authService = authService;
 
         _listener.ConnectionRequestEvent += ListenerOnConnectionRequestEvent;
         
@@ -131,19 +134,33 @@ public class ServerManager
     
     private void ListenerOnConnectionRequestEvent(ConnectionRequest request)
     {
-        if (_logger.IsEnabled(LogLevel.Trace)) 
-            _logger.LogTrace("Connection request from {EndPoint}", request.RemoteEndPoint);
+        if (_logger.IsEnabled(LogLevel.Debug)) 
+            _logger.LogDebug("Connection request from {EndPoint}", request.RemoteEndPoint);
 
-        // TODO: Authentication, Authorization?
-        var peer = request.AcceptIfKey(NetworkConstants.ConnectKey);
-        if (peer == null)
+        var raw = request.Data.GetRemainingBytesSpan();
+        if (!PacketSerializer.TrySplitPacket<ProtocolAuthenticateCmd>(raw, out var packetType, out var authenticate))
         {
-            _logger.LogWarning("Rejected connection from {EndPoint}: invalid connect key", request.RemoteEndPoint);
+            // We need to notify the rejection?
+            request.RejectForce();
+            _logger.LogWarning("Rejected connection from {EndPoint} due to invalid initial packet!", request.RemoteEndPoint);
             return;
         }
 
+        // Validate token
+        if (packetType != PacketType.ProtocolAuthenticate && 
+            !_authService.IsTokenValid(authenticate.Token))
+        {
+            request.Reject();
+            _logger.LogWarning("Rejected connection from {EndPoint} due to invalid token: {token}.", request.RemoteEndPoint, authenticate.Token);
+            return;
+        }
+        
+        var peer = request.Accept();
+
         if (_logger.IsEnabled(LogLevel.Trace))
             _logger.LogTrace("Accepted connection, peer {peerId}", peer.Id);
+        
+        
     }
     
     #endregion
