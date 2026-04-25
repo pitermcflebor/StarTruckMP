@@ -3,6 +3,10 @@ name: Build & Release (alpha)
 on:
   push:
     branches: [main]
+    paths:
+      - 'StarTruckMP.Client/**'
+      - 'StarTruckMP.Server/**'
+      - 'StarTruckMP.Shared/**'
   workflow_dispatch:
     inputs:
       version:
