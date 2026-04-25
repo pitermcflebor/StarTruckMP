@@ -1,4 +1,4 @@
-# StarTruckerMP
+# StarTruckMP
 Please report bugs & issues to the [Issues](https://github.com/pitermcflebor/StarTruckerMP/issues) tab.
 
 > [!CAUTION]
