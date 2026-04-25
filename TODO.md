@@ -4,11 +4,11 @@
 - [ ] Ghost Mode for when too close in Collection/Drop Off Zones/Bays
 - [ ] Toggle Collision in Server Settings
 - [ ] GUI for Hosting & Joining Server
-- [ ] Rework code as it is hacked together just to get things working
+- [x] Rework code as it is hacked together just to get things working
 - [ ] GUI for Player List
 - [ ] GUI for Player Names above Player / Trucks when inside
 - [ ] In-Game Text Chat
-- [ ] Dedicated Server
+- [x] Dedicated Server
 
 
 # Feature Wishlist
