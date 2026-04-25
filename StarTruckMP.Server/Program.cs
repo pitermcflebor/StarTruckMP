@@ -80,10 +80,10 @@ internal class Program
             }
 
             var serverSettings = JsonSerializer.Deserialize<ServerSettings>(
-                File.ReadAllText("server.json"), App.JsonOptionsRead);
-            if (serverSettings != null) return serverSettings;
+                File.ReadAllText("server.json"), App.JsonOptionsRead) ?? new ServerSettings();
 
-            serverSettings = new ServerSettings();
+            // rewrite the settings file on every startup to ensure it has all the latest fields,
+            // and to fix any formatting issues.
             File.WriteAllText("server.json", JsonSerializer.Serialize(serverSettings, App.JsonOptionsWrite));
             return serverSettings;
         });
