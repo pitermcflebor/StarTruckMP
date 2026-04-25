@@ -1,0 +1,75 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: [self-hosted, docker, dotnet10]
+    environment: production
+
+    env:
+      StarTruckBepInEx: /dlls
+      StarTruckBepInExSteam: /dlls
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # CLIENT
+      - name: Publish Client
+        run: |
+          dotnet publish StarTruckMP.Client/StarTruckMP.Client.csproj \
+            -c Release \
+            -o ./artifacts/client
+
+      # SERVER (single file)
+      - name: Publish Server win-x64
+        run: |
+          dotnet publish StarTruckMP.Server/StarTruckMP.Server.csproj \
+            -c Release \
+            -r win-x64 \
+            --no-self-contained \
+            -p:PublishSingleFile=true \
+            -o ./artifacts/server-win
+
+      - name: Publish Server linux-x64
+        run: |
+          dotnet publish StarTruckMP.Server/StarTruckMP.Server.csproj \
+            -c Release \
+            -r linux-x64 \
+            --no-self-contained \
+            -p:PublishSingleFile=true \
+            -o ./artifacts/server-linux
+
+      # SERVER (docker, no single file)
+      - name: Publish Server Docker
+        run: |
+          dotnet publish StarTruckMP.Server/StarTruckMP.Server.csproj \
+            -c Release \
+            --no-self-contained \
+            -o ./artifacts/server-docker
+
+      # ZIP
+      - name: Compress artifacts
+        run: |
+          cd artifacts
+          zip -r ../StarTruckMP-bepinex-plugin.zip    client/
+          zip -r ../StarTruckMP-server-win-x64.zip    server-win/
+          zip -r ../StarTruckMP-server-linux-x64.zip  server-linux/
+          zip -r ../StarTruckMP-server-docker.zip     server-docker/
+
+      # RELEASE
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: "StarTruckMP v${{ github.run_number }}"
+          generate_release_notes: true
+          files: |
+            StarTruckMP-bepinex-plugin.zip
+            StarTruckMP-server-win-x64.zip
+            StarTruckMP-server-linux-x64.zip
+            StarTruckMP-server-docker.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
