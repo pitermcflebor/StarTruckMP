@@ -1,0 +1,10 @@
+﻿services:
+  startruckmp:
+    build: .
+    container_name: startruckmp
+    restart: unless-stopped
+    ports:
+      - "7777:7777/udp"
+      - "7777:7777/tcp"
+    volumes:
+      - ./server.json:/app/server.json
