@@ -14,7 +14,7 @@
     </RestoreAdditionalProjectSources>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <RootNamespace>StarTruckMP</RootNamespace>
-    <PackageId>StarTruckMP.Plugin</PackageId>
+    <PackageId>StarTruckMP.Plugin.OldImplementation</PackageId>
   </PropertyGroup>
 
   <ItemGroup>
