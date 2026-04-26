@@ -5,6 +5,9 @@
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <RunSvelteBuild Condition="'$(RunSvelteBuild)' == ''">true</RunSvelteBuild>
+        <RunSvelteBuild Condition="'$(CI)' == 'true'">false</RunSvelteBuild>
+        <CompressionExcludePatterns>$(CompressionExcludePatterns);wwwroot/overlay/**</CompressionExcludePatterns>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Configuration)'=='Release'">
@@ -13,30 +16,28 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="Microsoft.Extensions.Hosting.Systemd" Version="10.0.6" />
-      <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.6" />
+        <PackageReference Include="Microsoft.Extensions.Hosting.Systemd" Version="10.0.6" />
+        <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.6" />
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\StarTruckMP.Shared\StarTruckMP.Shared.csproj" />
+        <ProjectReference Include="..\StarTruckMP.Shared\StarTruckMP.Shared.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-      <Content Remove="server.json" />
-      <None Include="server.json">
-        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-      </None>
+        <Content Remove="server.json" />
+        <None Include="server.json">
+            <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+        </None>
     </ItemGroup>
 
-
-    <!-- Build the SvelteKit overlay UI before the .NET build -->
-    <Target Name="BuildSvelteOverlayUI" BeforeTargets="Build">
-      <Message Text="Installing overlay-ui npm dependencies..." Importance="high" />
-      <Exec Command="npm install" WorkingDirectory="$(MSBuildProjectDirectory)\overlay-ui" />
-      <Message Text="Building overlay-ui SvelteKit project..." Importance="high" />
-      <Exec Command="npm run build" WorkingDirectory="$(MSBuildProjectDirectory)\overlay-ui" />
+    <Target Name="BuildSvelteOverlayUI"
+            BeforeTargets="Build"
+            Condition="'$(RunSvelteBuild)' == 'true'">
+        <Message Text="Installing overlay-ui npm dependencies..." Importance="high" />
+        <Exec Command="npm install" WorkingDirectory="$(MSBuildProjectDirectory)\overlay-ui" />
+        <Message Text="Building overlay-ui SvelteKit project..." Importance="high" />
+        <Exec Command="npm run build" WorkingDirectory="$(MSBuildProjectDirectory)\overlay-ui" />
     </Target>
 
 </Project>
-
-

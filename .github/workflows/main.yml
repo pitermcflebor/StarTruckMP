@@ -29,7 +29,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # CLIENT
+      - name: Build overlay-ui
+        run: |
+          cd StarTruckMP.Server/overlay-ui
+          npm ci
+          npm run build
+
       - name: Publish Client
         run: |
           dotnet publish StarTruckMP.Client/StarTruckMP.Client.csproj \
@@ -37,7 +42,9 @@ jobs:
             -p:EnableWindowsTargeting=true \
             -o ./artifacts/client
 
-      # SERVER (single file)
+      - name: Clean Server before win-x64
+        run: rm -rf StarTruckMP.Server/bin StarTruckMP.Server/obj
+
       - name: Publish Server win-x64
         run: |
           dotnet publish StarTruckMP.Server/StarTruckMP.Server.csproj \
@@ -45,7 +52,11 @@ jobs:
             -r win-x64 \
             --no-self-contained \
             -p:PublishSingleFile=true \
+            -p:RunSvelteBuild=false \
             -o ./artifacts/server-win
+
+      - name: Clean Server before linux-x64
+        run: rm -rf StarTruckMP.Server/bin StarTruckMP.Server/obj
 
       - name: Publish Server linux-x64
         run: |
@@ -54,17 +65,20 @@ jobs:
             -r linux-x64 \
             --no-self-contained \
             -p:PublishSingleFile=true \
+            -p:RunSvelteBuild=false \
             -o ./artifacts/server-linux
 
-      # SERVER (docker, no single file)
+      - name: Clean Server before docker publish
+        run: rm -rf StarTruckMP.Server/bin StarTruckMP.Server/obj
+
       - name: Publish Server Docker
         run: |
           dotnet publish StarTruckMP.Server/StarTruckMP.Server.csproj \
             -c Release \
             --no-self-contained \
+            -p:RunSvelteBuild=false \
             -o ./artifacts/server-docker
 
-      # ZIP
       - name: Compress artifacts
         run: |
           echo '{}' > ./artifacts/server-docker/settings.json
@@ -73,7 +87,6 @@ jobs:
           cd ./artifacts/server-linux  && zip -r ../../StarTruckMP-server-linux-x64.zip . && cd ../..
           cd ./artifacts/server-docker && zip -r ../../StarTruckMP-server-docker.zip .    && cd ../..
 
-      # RELEASE
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
