@@ -145,9 +145,9 @@ public class ServerManager
             _logger.LogWarning("Rejected connection from {EndPoint} due to invalid initial packet!", request.RemoteEndPoint);
             return;
         }
-
+        
         // Validate token
-        if (packetType != PacketType.ProtocolAuthenticate && 
+        if (packetType != PacketType.ProtocolAuthenticate || 
             !_authService.IsTokenValid(authenticate.Token))
         {
             request.Reject();
@@ -159,8 +159,6 @@ public class ServerManager
 
         if (_logger.IsEnabled(LogLevel.Trace))
             _logger.LogTrace("Accepted connection, peer {peerId}", peer.Id);
-        
-        
     }
     
     #endregion
