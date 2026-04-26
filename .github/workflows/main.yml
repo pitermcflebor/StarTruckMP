@@ -34,6 +34,7 @@ jobs:
         run: |
           dotnet publish StarTruckMP.Client/StarTruckMP.Client.csproj \
             -c Release \
+            -p:EnableWindowsTargeting=true \
             -o ./artifacts/client
 
       # SERVER (single file)

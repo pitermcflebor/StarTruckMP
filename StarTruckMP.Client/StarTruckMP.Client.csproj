@@ -134,7 +134,7 @@
     <Target Name="BuildAndStageOverlayHost" AfterTargets="Build">
         <MSBuild Projects="..\StarTruckMP.Overlay.Host\StarTruckMP.Overlay.Host.csproj"
                  Targets="Restore;Build"
-                 Properties="Configuration=$(Configuration);NuGetPackageRoot=$(NuGetPackageRoot)"
+                 Properties="Configuration=$(Configuration);NuGetPackageRoot=$(NuGetPackageRoot);EnableWindowsTargeting=$(EnableWindowsTargeting)"
                  RemoveProperties="TargetFramework;TargetFrameworks;RuntimeIdentifier;PublishDir;PublishProfile;PublishUrl;SelfContained;PublishSingleFile;PublishTrimmed;PublishReadyToRun" />
 
         <ItemGroup>
