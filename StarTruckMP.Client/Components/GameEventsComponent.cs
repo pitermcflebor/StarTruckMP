@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Threading;
 using StarTruckMP.Client.Synchronization;
+using StarTruckMP.Client.UI;
 using StarTruckMP.Shared;
 using StarTruckMP.Shared.Dto;
 using UnityEngine;
@@ -67,6 +68,25 @@ public class GameEventsComponent : MonoBehaviour
         // TODO: maybe this component not exists?
         if (PlayerState.SpaceSuitMats == null &&  PlayerState.SpaceSuit != null)
             PlayerState.SpaceSuitMats = PlayerState.SpaceSuit.GetComponent<MeshRenderer>()?.materials.ToArray();
+        
+        // Real overlay hotkeys: F2 toggles UI mode and Esc closes it.
+        if (Input.GetKeyDown(KeyCode.F2))
+        {
+            OverlayManager.ToggleInteractiveMode();
+            App.Log.LogInfo($"[Overlay] F2 => toggle interactive mode => {(OverlayManager.IsInteractiveMode ? "ON" : "OFF")}");
+        }
+
+        if (OverlayManager.IsInteractiveMode && Input.GetKeyDown(KeyCode.Escape))
+        {
+            App.Log.LogInfo("[Overlay] Esc => interactive mode OFF (click-through ON)");
+            OverlayManager.SetInteractiveMode(false);
+        }
+
+        if (Input.GetKeyDown(KeyCode.F8))
+        {
+            App.Log.LogInfo("[Overlay] running diagnostics page");
+            OverlayManager.RunDiagnostics();
+        }
     }
     
     private CancellationTokenSource _cts = new();

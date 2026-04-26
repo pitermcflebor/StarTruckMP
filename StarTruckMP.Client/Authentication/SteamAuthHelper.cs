@@ -8,6 +8,7 @@ using BepInEx.Logging;
 using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using StarTruckMP.Shared.Cmd.Api;
 using StarTruckMP.Shared.Dto.Api;
+using StarTruckMP.Client.UI;
 
 namespace StarTruckMP.Client.Authentication;
 
@@ -120,8 +121,26 @@ internal static class SteamAuthHelper
             }
 
             using var stream = response.Content.ReadAsStream();
-            var body = JsonSerializer.Deserialize<TicketAuthenticationDto>(stream);
-            App.Log.LogInfo($"[Auth] Steam token: {body?.Token}");
+            var body = JsonSerializer.Deserialize<TicketAuthenticationDto>(stream, App.JsonReaderOptions);
+            if (body == null)
+            {
+                var rawResult = response.Content.ReadAsStringAsync().Result;
+                App.Log.LogError($"[Auth] Failed to parse Steam auth response body. Content: {rawResult}");
+                return;
+            }
+            
+            App.Log.LogInfo($"[Auth] Steam token: {body.Token}");
+            if (body.Token == null)
+            {
+                var rawResult = response.Content.ReadAsStringAsync().Result;
+                App.Log.LogError($"[Auth] Token was empty. Content: {rawResult}");
+            }
+
+            if (body.Token == null) return;
+            
+            OverlayManager.SetSessionTokenAndNavigate(
+                body.Token,
+                $"http://{App.ServerAddress.Value}:{App.ServerPort.Value}/overlay");
         }
         catch (Exception ex)
         {

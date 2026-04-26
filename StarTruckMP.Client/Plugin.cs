@@ -15,11 +15,9 @@ using Il2CppInterop.Runtime.Injection;
 using StarTruckMP.Client.Authentication;
 using StarTruckMP.Client.Components;
 using StarTruckMP.Client.Synchronization;
+using StarTruckMP.Client.UI;
 using StarTruckMP.Shared.Cmd.Api;
 using StarTruckMP.Shared.Dto.Api;
-using UnityEngine;
-using UnityEngine.UIElements;
-using Object = UnityEngine.Object;
 
 namespace StarTruckMP.Client;
 
@@ -53,23 +51,21 @@ public class Plugin : BasePlugin
 
         Harmony.CreateAndPatchAll(typeof(ClientHooks));
         Log.LogInfo($"Plugin {PluginInfo.PLUGIN_GUID} loaded.");
+        
+        #if DEBUG
+        OverlayManager.MessageReceived += (type, payload) =>
+        {
+            Log.LogInfo($"[Overlay] Received '{type}' payload: {payload}");
+            if (type == "overlayLoaded")
+                OverlayManager.PostMessage("ping", new { time = DateTimeOffset.Now.ToUnixTimeMilliseconds() });
+        };
+        #endif
     }
 
     private void SetupUI()
     {
-        var bundlePath = Path.Combine(Paths.PluginPath, "StarTruckMP", "UI", "startruckmpui.stmpui");
-        if (!File.Exists(bundlePath))
-        {
-            App.Log.LogError($"UI bundle not found at path: {bundlePath}");
-            return;
-        }
-        var bundle = AssetBundle.LoadFromFile(bundlePath);
-        var uxml = bundle.LoadAsset<VisualTreeAsset>("Assets/UI/StarTruckMP.uxml");
-        var go = new GameObject("StarTruckMP.UI");
-        var doc = go.AddComponent<UIDocument>();
-        doc.visualTreeAsset = uxml;
-        
-        Object.DontDestroyOnLoad(go);
+        OverlayManager.Launch();
+        // Navigation is deferred until a session token is obtained from auth.
     }
 
     private void SetupComponents()
@@ -172,8 +168,13 @@ public class Plugin : BasePlugin
             }
 
             using var stream = response.Content.ReadAsStream();
-            var body = JsonSerializer.Deserialize<TicketAuthenticationDto>(stream);
+            var body = JsonSerializer.Deserialize<TicketAuthenticationDto>(stream, App.JsonReaderOptions);
             App.Log.LogInfo($"[Auth] Token: {body?.Token}");
+
+            if (body?.Token != null)
+                OverlayManager.SetSessionTokenAndNavigate(
+                    body.Token,
+                    $"http://{App.ServerAddress.Value}:{App.ServerPort.Value}/overlay");
         }
         catch (Exception ex)
         {

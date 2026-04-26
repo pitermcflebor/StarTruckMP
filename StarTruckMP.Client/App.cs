@@ -1,4 +1,5 @@
-﻿using BepInEx.Configuration;
+﻿using System.Text.Json;
+using BepInEx.Configuration;
 using BepInEx.Logging;
 
 namespace StarTruckMP.Client;
@@ -15,4 +16,7 @@ public static class App
     }
 
     public static ManualLogSource Log;
+    
+    public static JsonSerializerOptions JsonReaderOptions = new() { PropertyNameCaseInsensitive = true };
+    public static JsonSerializerOptions JsonWriterOptions = new() { WriteIndented = false };
 }

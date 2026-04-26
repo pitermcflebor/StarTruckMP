@@ -127,9 +127,34 @@
       <ProjectReference Include="..\StarTruckMP.Shared\StarTruckMP.Shared.csproj" />
     </ItemGroup>
 
-    <ItemGroup>
-      <None Update="UI\startruckmpui.stmpui">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-    </ItemGroup>
+    <PropertyGroup>
+        <OverlayHostOutputDir>..\StarTruckMP.Overlay.Host\bin\$(Configuration)\net10.0-windows10.0.19041.0\win-x64</OverlayHostOutputDir>
+    </PropertyGroup>
+
+    <Target Name="BuildAndStageOverlayHost" AfterTargets="Build">
+        <MSBuild Projects="..\StarTruckMP.Overlay.Host\StarTruckMP.Overlay.Host.csproj"
+                 Targets="Restore;Build"
+                 Properties="Configuration=$(Configuration);NuGetPackageRoot=$(NuGetPackageRoot)"
+                 RemoveProperties="TargetFramework;TargetFrameworks;RuntimeIdentifier;PublishDir;PublishProfile;PublishUrl;SelfContained;PublishSingleFile;PublishTrimmed;PublishReadyToRun" />
+
+        <ItemGroup>
+            <OverlayHostFiles Include="$(OverlayHostOutputDir)\**\*.*" />
+        </ItemGroup>
+
+        <MakeDir Directories="$(TargetDir)overlay" />
+        <Copy SourceFiles="@(OverlayHostFiles)"
+              DestinationFiles="@(OverlayHostFiles->'$(TargetDir)overlay\%(RecursiveDir)%(Filename)%(Extension)')"
+              SkipUnchangedFiles="true" />
+    </Target>
+
+    <Target Name="IncludeOverlayHostInPublish" BeforeTargets="ComputeFilesToPublish">
+        <ItemGroup>
+            <OverlayPublishFiles Include="$(OverlayHostOutputDir)\**\*.*" />
+            <ResolvedFileToPublish Include="@(OverlayPublishFiles)">
+                <TargetPath>overlay\%(RecursiveDir)%(Filename)%(Extension)</TargetPath>
+                <RelativePath>overlay\%(RecursiveDir)%(Filename)%(Extension)</RelativePath>
+                <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+            </ResolvedFileToPublish>
+        </ItemGroup>
+    </Target>
 </Project>

@@ -113,6 +113,7 @@ public class NetworkEventsComponent : MonoBehaviour
         var customization = exterior.transform.GetComponent<CustomizationApplier>();
         if (customization != null)
         {
+            // TODO: only use LiveryAndDamageApplier
             var livDamApp = exterior.transform.GetComponent<LiveryAndDamageApplierTruckExterior>();
             customization.m_linkedLiveryApplier = livDamApp;
         }

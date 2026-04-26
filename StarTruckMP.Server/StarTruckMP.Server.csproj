@@ -28,6 +28,15 @@
       </None>
     </ItemGroup>
 
+
+    <!-- Build the SvelteKit overlay UI before the .NET build -->
+    <Target Name="BuildSvelteOverlayUI" BeforeTargets="Build">
+      <Message Text="Installing overlay-ui npm dependencies..." Importance="high" />
+      <Exec Command="npm install" WorkingDirectory="$(MSBuildProjectDirectory)\overlay-ui" />
+      <Message Text="Building overlay-ui SvelteKit project..." Importance="high" />
+      <Exec Command="npm run build" WorkingDirectory="$(MSBuildProjectDirectory)\overlay-ui" />
+    </Target>
+
 </Project>
 
 

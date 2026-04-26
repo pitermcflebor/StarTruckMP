@@ -31,6 +31,7 @@ internal class Program
                 opt.ColorBehavior = LoggerColorBehavior.Enabled;
                 opt.TimestampFormat = "[yyyy-MM-dd HH:mm:ss] ";
             })
+            .AddFilter("Microsoft.AspNetCore", LogLevel.Warning) // filter out noisy Kestrel logs
 #if DEBUG
             .SetMinimumLevel(LogLevel.Information)
 #endif
@@ -100,6 +101,9 @@ internal class Program
         var app = builder.Build();
 
         App.ServiceProvider = app.Services;
+
+        // Serve SvelteKit static assets (JS, CSS, fonts, etc.) from wwwroot
+        app.UseStaticFiles();
 
         app.MapControllers();
         
