@@ -29,6 +29,18 @@
         <None Include="server.json">
             <CopyToOutputDirectory>Never</CopyToOutputDirectory>
         </None>
+        <Content Remove="overlay-ui\package.json" />
+        <None Include="overlay-ui\package.json">
+          <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+        </None>
+        <Content Remove="overlay-ui\package-lock.json" />
+        <None Include="overlay-ui\package-lock.json">
+          <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+        </None>
+        <Content Remove="overlay-ui\tsconfig.json" />
+        <None Include="overlay-ui\tsconfig.json">
+          <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+        </None>
     </ItemGroup>
 
     <Target Name="BuildSvelteOverlayUI"
