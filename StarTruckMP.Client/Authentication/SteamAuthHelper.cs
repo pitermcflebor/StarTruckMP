@@ -138,6 +138,8 @@ internal static class SteamAuthHelper
 
             if (body.Token == null) return;
             
+            PlayerState.Token = body.Token;
+            
             OverlayManager.SetSessionTokenAndNavigate(
                 body.Token,
                 $"http://{App.ServerAddress.Value}:{App.ServerPort.Value}/overlay");

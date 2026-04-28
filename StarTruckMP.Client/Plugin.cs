@@ -171,10 +171,12 @@ public class Plugin : BasePlugin
             var body = JsonSerializer.Deserialize<TicketAuthenticationDto>(stream, App.JsonReaderOptions);
             App.Log.LogInfo($"[Auth] Token: {body?.Token}");
 
-            if (body?.Token != null)
-                OverlayManager.SetSessionTokenAndNavigate(
-                    body.Token,
-                    $"http://{App.ServerAddress.Value}:{App.ServerPort.Value}/overlay");
+            if (body?.Token == null) return;
+            PlayerState.Token = body.Token;
+            
+            OverlayManager.SetSessionTokenAndNavigate(
+                body.Token,
+                $"http://{App.ServerAddress.Value}:{App.ServerPort.Value}/overlay");
         }
         catch (Exception ex)
         {
