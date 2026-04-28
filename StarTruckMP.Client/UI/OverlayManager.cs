@@ -212,8 +212,10 @@ internal static class OverlayManager
 
     private static JsonSerializerOptions _jsonOpt = new()
     {
+        PropertyNameCaseInsensitive = true,
         WriteIndented = false,
-        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
     
     public static void PostMessage<T>(string type, T? data)
@@ -408,8 +410,14 @@ internal static class OverlayManager
 
             var type = root.GetProperty("type").GetString() ?? string.Empty;
             var payload = root.TryGetProperty("payload", out var p) ? p.GetRawText() : null;
-
-            App.Log.LogInfo($"[Overlay] Message from overlay: type={type}");
+            if (type.Equals("overlayModeChanged", StringComparison.OrdinalIgnoreCase) &&
+                p.ValueKind == JsonValueKind.Object &&
+                p.TryGetProperty("interactive", out var interactiveElement) &&
+                (interactiveElement.ValueKind == JsonValueKind.True || interactiveElement.ValueKind == JsonValueKind.False))
+            {
+                _interactiveMode = interactiveElement.GetBoolean();
+            }
+            
             MessageReceived?.Invoke(type, payload);
         }
         catch (Exception ex)

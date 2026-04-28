@@ -1,5 +1,6 @@
 <script lang="ts">
     import {type GameMessage, onGameMessage, sendToGame} from "$lib/gameEvents";
+    import ObjectInspector from "$lib/inspector/ObjectInspector.svelte";
     
     let lastMessage = $state<GameMessage>({} as GameMessage);
     
@@ -14,10 +15,16 @@
     }
 </script>
 
-<h1>StarTruckMP overlay loaded</h1>
-<h2>Last message: {lastMessage.type} | {lastMessage.source}</h2>
-<code>
-    {JSON.stringify(lastMessage.payload, null, 2)}
-</code>
+<div class="container">
+    <ObjectInspector />
+</div>
 
-<button onclick={testBtn}>Test</button>
+<style>
+    .container {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+    }
+</style>

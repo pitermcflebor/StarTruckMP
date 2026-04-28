@@ -55,9 +55,8 @@ public class Plugin : BasePlugin
         #if DEBUG
         OverlayManager.MessageReceived += (type, payload) =>
         {
-            Log.LogInfo($"[Overlay] Received '{type}' payload: {payload}");
             if (type == "overlayLoaded")
-                OverlayManager.PostMessage("ping", new { time = DateTimeOffset.Now.ToUnixTimeMilliseconds() });
+                App.Log.LogInfo("[Overlay] Overlay has loaded and is ready to receive messages.");
         };
         #endif
     }
