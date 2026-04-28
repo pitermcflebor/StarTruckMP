@@ -1,4 +1,5 @@
 ﻿using Avalonia.Threading;
+using System.Text.Json;
 using StarTruckMP.Overlay.Browser;
 using StarTruckMP.Overlay.Core.Abstractions;
 using StarTruckMP.Overlay.Core.Ipc;
@@ -17,6 +18,7 @@ internal sealed class OverlayCoordinator : IDisposable
     private readonly OverlayModeService _modeService;
     private readonly GameWindowTracker _tracker;
     private readonly Win32WindowStyles _windowStyles;
+    private readonly GamePipeClient _pipeToGame;
     private readonly OverlayPipeServer _pipeServer;
     private readonly IOverlayLogger _logger;
     private const string DefaultStartupUrl = "about:blank";
@@ -30,6 +32,7 @@ internal sealed class OverlayCoordinator : IDisposable
         OverlayModeService modeService,
         GameWindowTracker tracker,
         Win32WindowStyles windowStyles,
+        GamePipeClient pipeToGame,
         OverlayPipeServer pipeServer,
         IOverlayLogger logger)
     {
@@ -39,6 +42,7 @@ internal sealed class OverlayCoordinator : IDisposable
         _modeService = modeService;
         _tracker = tracker;
         _windowStyles = windowStyles;
+        _pipeToGame = pipeToGame;
         _pipeServer = pipeServer;
         _logger = logger;
         _browser.FrameReady += OnBrowserFrameReady;
@@ -180,6 +184,7 @@ internal sealed class OverlayCoordinator : IDisposable
             _window.Activate();
             _window.Focus();
             _windowStyles.FocusWindow(hwnd);
+            NotifyUiModeChanged(enabled: true);
             _logger.Info("[Mode] UI mode ON => overlay captures input");
             return;
         }
@@ -187,7 +192,22 @@ internal sealed class OverlayCoordinator : IDisposable
         _browser.SendFocusEvent(false);
         _windowStyles.SetClickThrough(hwnd, enabled: true);
         _windowStyles.FocusGameWindow(_tracker.CurrentState.Handle);
+        NotifyUiModeChanged(enabled: false);
         _logger.Info("[Mode] UI mode OFF => overlay is click-through and the game regains input");
+    }
+
+    private void NotifyUiModeChanged(bool enabled)
+    {
+        var json = JsonSerializer.Serialize(new
+        {
+            type = "overlayModeChanged",
+            payload = new
+            {
+                interactive = enabled
+            }
+        });
+
+        _pipeToGame.SendJsonLine(json);
     }
 
     private void ApplyWindowState(GameWindowState state)
