@@ -5,6 +5,8 @@ using StarTruckMP.Overlay.Browser;
 using StarTruckMP.Overlay.Core.Abstractions;
 using StarTruckMP.Overlay.Core.Services;
 using StarTruckMP.Overlay.Host.UI;
+using System.Runtime.InteropServices;
+using System.Text;
 
 namespace StarTruckMP.Overlay.Host.Services;
 
@@ -30,7 +32,6 @@ internal sealed class BrowserInputRouter : IDisposable
         _window.PointerWheelChanged += OnPointerWheelChanged;
         _window.KeyDown += OnKeyDown;
         _window.KeyUp += OnKeyUp;
-        _window.TextInput += OnTextInput;
     }
 
     public void Dispose()
@@ -45,7 +46,6 @@ internal sealed class BrowserInputRouter : IDisposable
         _window.PointerWheelChanged -= OnPointerWheelChanged;
         _window.KeyDown -= OnKeyDown;
         _window.KeyUp -= OnKeyUp;
-        _window.TextInput -= OnTextInput;
     }
 
     private void OnPointerMoved(object? sender, PointerEventArgs e)
@@ -58,7 +58,16 @@ internal sealed class BrowserInputRouter : IDisposable
             return;
 
         var point = ToBrowserPoint(e.GetPosition(_window));
-        host.SendMouseMoveEvent(new MouseEvent(point.X, point.Y, GetMouseModifiers(e.KeyModifiers)), mouseLeave: false);
+
+        // Include pressed mouse button flags so CEF knows the button state during a drag.
+        // Without this, click-and-drag text selection does not work.
+        var props = e.GetCurrentPoint(_window).Properties;
+        var modifiers = GetMouseModifiers(e.KeyModifiers);
+        if (props.IsLeftButtonPressed)   modifiers |= CefEventFlags.LeftMouseButton;
+        if (props.IsMiddleButtonPressed) modifiers |= CefEventFlags.MiddleMouseButton;
+        if (props.IsRightButtonPressed)  modifiers |= CefEventFlags.RightMouseButton;
+
+        host.SendMouseMoveEvent(new MouseEvent(point.X, point.Y, modifiers), mouseLeave: false);
     }
 
     private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
@@ -122,14 +131,34 @@ internal sealed class BrowserInputRouter : IDisposable
         if (virtualKey == 0)
             return;
 
+        // NativeKeyCode must be the hardware scan code, not the virtual key code.
+        // CEF uses it to populate KeyboardEvent.code in JavaScript.
+        var scanCode = (int)MapVirtualKey((uint)virtualKey, MapvkVkToVsc);
+        var keyModifiers = GetKeyModifiers(e.KeyModifiers);
+
         host.SendKeyEvent(new KeyEvent
         {
             Type = KeyEventType.RawKeyDown,
             WindowsKeyCode = virtualKey,
-            NativeKeyCode = virtualKey,
-            Modifiers = GetKeyModifiers(e.KeyModifiers),
+            NativeKeyCode = scanCode,
+            Modifiers = keyModifiers,
             IsSystemKey = e.KeyModifiers.HasFlag(KeyModifiers.Alt)
         });
+
+        // Avalonia's TextInput event is unreliable for overlay windows that obtain focus
+        // via Win32 SetFocus rather than normal activation. We generate Char events here
+        // directly from the current keyboard state so text always reaches CEF.
+        var chars = TranslateToChars(virtualKey, scanCode);
+        foreach (var ch in chars)
+        {
+            host.SendKeyEvent(new KeyEvent
+            {
+                Type = KeyEventType.Char,
+                WindowsKeyCode = ch,
+                NativeKeyCode = ch,
+                Modifiers = keyModifiers
+            });
+        }
 
         e.Handled = true;
     }
@@ -147,41 +176,19 @@ internal sealed class BrowserInputRouter : IDisposable
         if (virtualKey == 0)
             return;
 
+        var scanCode = (int)MapVirtualKey((uint)virtualKey, MapvkVkToVsc);
+
         host.SendKeyEvent(new KeyEvent
         {
             Type = KeyEventType.KeyUp,
             WindowsKeyCode = virtualKey,
-            NativeKeyCode = virtualKey,
+            NativeKeyCode = scanCode,
             Modifiers = GetKeyModifiers(e.KeyModifiers),
             IsSystemKey = e.KeyModifiers.HasFlag(KeyModifiers.Alt)
         });
 
         e.Handled = true;
     }
-
-    private void OnTextInput(object? sender, TextInputEventArgs e)
-    {
-        if (!_modeService.UiModeEnabled || string.IsNullOrEmpty(e.Text))
-            return;
-
-        var host = _browser.BrowserHost;
-        if (host == null)
-            return;
-
-        foreach (var ch in e.Text)
-        {
-            host.SendKeyEvent(new KeyEvent
-            {
-                Type = KeyEventType.Char,
-                WindowsKeyCode = ch,
-                NativeKeyCode = ch
-            });
-        }
-
-        e.Handled = true;
-    }
-
-    private bool CanRoutePointer() => _modeService.UiModeEnabled && _browser.BrowserHost != null;
 
     private PixelPoint ToBrowserPoint(Point point)
     {
@@ -325,6 +332,42 @@ internal sealed class BrowserInputRouter : IDisposable
             _ => 0
         };
     }
+
+    /// <summary>
+    /// Translates a virtual key + scan code to the characters it produces using the
+    /// current keyboard state (Shift, CapsLock, AltGr, etc.).
+    /// Returns an empty string for non-printable keys.
+    /// </summary>
+    private static string TranslateToChars(int virtualKey, int scanCode)
+    {
+        var keyState = new byte[256];
+        if (!GetKeyboardState(keyState))
+            return string.Empty;
+
+        var buffer = new StringBuilder(4);
+        var count = ToUnicode((uint)virtualKey, (uint)scanCode, keyState, buffer, buffer.Capacity, 0);
+
+        // count < 0 means a dead key was pressed; count 0 means no translation.
+        return count > 0 ? buffer.ToString(0, count) : string.Empty;
+    }
+
+    private bool CanRoutePointer() => _modeService.UiModeEnabled && _browser.BrowserHost != null;
+
+    // MAPVK_VK_TO_VSC: converts a virtual key code to the corresponding scan code.
+    private const uint MapvkVkToVsc = 0;
+
+    [DllImport("user32.dll")]
+    private static extern uint MapVirtualKey(uint uCode, uint uMapType);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetKeyboardState(byte[] lpKeyState);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int ToUnicode(
+        uint wVirtKey,
+        uint wScanCode,
+        byte[] lpKeyState,
+        StringBuilder pwszBuff,
+        int cchBuff,
+        uint wFlags);
 }
-
-

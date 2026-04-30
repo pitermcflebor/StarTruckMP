@@ -6,7 +6,9 @@ public static class Utils
 {
     public static TruckInfo ExtractTruckInfo(GameObject truckObj)
     {
-        var livery = truckObj.GetComponent<LiveryAndDamageApplierTruckExterior>();
+        // LiveryAndDamageApplierTruckExterior can be on a child object (e.g. "NPCTruck" or "Exterior")
+        var livery = truckObj.GetComponentInChildren<LiveryAndDamageApplierTruckExterior>();
+        if (livery == null) return new TruckInfo();
         
         return new TruckInfo
         {

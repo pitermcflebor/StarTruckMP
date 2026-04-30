@@ -5,8 +5,10 @@ using StarTruckMP.Shared;
 using StarTruckMP.Shared.Cmd;
 using StarTruckMP.Shared.Dto;
 using UnityEngine;
+using UnityEngine.AddressableAssets;
 using UnityEngine.SceneManagement;
 using Object = Il2CppSystem.Object;
+using Quaternion = UnityEngine.Quaternion;
 using SynchronizationContext = Il2CppSystem.Threading.SynchronizationContext;
 using Vector3 = UnityEngine.Vector3;
 
@@ -28,10 +30,11 @@ public class NetworkEventsComponent : MonoBehaviour
         Network.OnPlayerSectorUpdate += HandlePlayerSectorUpdate;
         Network.OnPlayerPositionUpdate += HandlePlayerPositionUpdate;
         Network.OnTruckLiveryUpdate += HandleTruckLiveryUpdate;
+        Network.OnTrailerUpdate += HandleTrailerUpdate;
         
         App.Log.LogInfo("NetworkEventsComponent Awake and subscribed to network events");
     }
-    
+
     private IMemoryCache _players = new MemoryCache(new MemoryCacheOptions());
 
     private class NetPlayer
@@ -40,7 +43,6 @@ public class NetworkEventsComponent : MonoBehaviour
         public string PlayerName { get; set; }
         public GameObject TruckObj { get; set; }
         public GameObject PlayerObj { get; set; }
-        public GameObject TruckExteriorObj { get; set; }
         public GameObject SuitObj { get; set; }
     }
 
@@ -58,27 +60,15 @@ public class NetworkEventsComponent : MonoBehaviour
 
         #region Truck setup
 
-        player.TruckObj = new GameObject($"ClientTruck-{netId}");
-        App.Log.LogInfo($"({netId}) Created truck");
-        SceneManager.MoveGameObjectToScene(player.TruckObj, scene!.Value);
-        App.Log.LogInfo($"({netId}) Moved truck to scene");
-        player.TruckObj.transform.SetParent(null);
-        var rigid = player.TruckObj.AddComponent<Rigidbody>();
-        var rigidProb = PlayerState.Truck.GetComponent<Rigidbody>();
-        App.Log.LogInfo($"({netId}) Added Rigidbody to truck");
-        rigid.useGravity = rigidProb.useGravity;
-        rigid.drag = rigidProb.drag;
-        rigid.angularDrag = rigidProb.angularDrag;
-        rigid.mass = rigidProb.mass;
-        rigid.centerOfMass = rigidProb.centerOfMass;
-        rigid.detectCollisions = false;
-        rigid.isKinematic = rigidProb.isKinematic;
-        rigid.maxAngularVelocity = rigidProb.maxAngularVelocity;
-        rigid.maxDepenetrationVelocity = rigidProb.maxDepenetrationVelocity;
-        rigid.inertiaTensor = rigidProb.inertiaTensor;
-        rigid.inertiaTensorRotation = rigidProb.inertiaTensorRotation;
-        App.Log.LogInfo($"({netId}) Configured Rigidbody of truck");
-        
+        player.TruckObj = TruckFactory.CreatePlayerTruck(0, Vector3.zero, Quaternion.identity);
+        if (player.TruckObj == null) App.Log.LogError($"({netId}) Failed to create player truck object");
+        App.Log.LogInfo($"({netId}) Created player truck object");
+
+        var rigidbody = player.TruckObj.GetComponent<Rigidbody>();
+        rigidbody.detectCollisions = false;
+        var colliders = player.TruckObj.GetComponentsInChildren<Collider>();
+        foreach (var collider in colliders) DestroyImmediate(collider);
+
         #endregion
 
         #region Player setup
@@ -89,43 +79,6 @@ public class NetworkEventsComponent : MonoBehaviour
         App.Log.LogInfo($"({netId}) Moved player object to scene");
         player.PlayerObj.transform.SetParent(null);
 
-        #endregion
-        
-        #region Truck Exterior setup
-        
-        var exteriorProb = GameObject.Find("Exterior");
-        App.Log.LogInfo($"({netId}) Found exterior prefab {exteriorProb.GetIl2CppType().FullName}");
-        
-        var exterior = GameObject.Instantiate(exteriorProb,
-            Vector3.zero,
-            Quaternion.EulerAngles(Vector3.zero),
-            player.TruckObj.transform);
-        exterior.name = $"ClientExterior-{netId}";
-        App.Log.LogInfo($"({netId}) Instantiated exterior");
-        player.TruckExteriorObj = exterior;
-        exterior.transform.Find("StarTruck_Hatch").Find("Marker").gameObject.SetActive(false);
-        Destroy(exterior.transform.Find("StarTruck_Hatch").GetChild(0).GetComponent<DoorAnimator>());
-        Destroy(exterior.transform.Find("StarTruck_Hatch").GetChild(0).GetComponent<GameEventListener>());
-        Destroy(exterior.transform.Find("StarTruck_Hatch").GetChild(0).GetComponent<EPOOutline.TargetStateListener>());
-        exterior.transform.Find("MonitorCameras").gameObject.SetActive(false);
-        exterior.transform.Find("PlayerSpawnMarker").gameObject.SetActive(false);
-        exterior.transform.Find("ThrusterCameraShakeController").gameObject.SetActive(false);
-        var customization = exterior.transform.GetComponent<CustomizationApplier>();
-        if (customization != null)
-        {
-            // TODO: only use LiveryAndDamageApplier
-            var livDamApp = exterior.transform.GetComponent<LiveryAndDamageApplierTruckExterior>();
-            customization.m_linkedLiveryApplier = livDamApp;
-        }
-        // Why this would happen?
-        else App.Log.LogError($"({netId}) Could not find CustomizationApplier on exterior");
-        
-        // Disable collision
-        foreach (var collider in exterior.GetComponentsInChildren<Collider>())
-            collider.enabled = false;
-        
-        App.Log.LogInfo($"({netId}) Configured exterior");
-        
         #endregion
         
         #region Player suit setup
@@ -154,14 +107,37 @@ public class NetworkEventsComponent : MonoBehaviour
         return player;
     }
 
+    private void RecreateNetPlayerTruck(int netId, int cargoCount)
+    {
+        if (!_players.TryGetValue(netId, out NetPlayer player))
+            return;
+        
+        // copy actual data
+        player.TruckObj.transform.GetPositionAndRotation(out var currentPos, out var currentRot);
+        var customizer = player.TruckObj.GetComponent<AIVehicleCustomiser>();
+        var liveryId = customizer.m_cabLiveryApplier.CurrentLiveryId ?? customizer.m_cabLiveryApplier.AppliedLiveryId;
+        // delete
+        player.TruckObj.SetActive(false);
+        DestroyImmediate(player.TruckObj);
+        // recreate with same data
+        player.TruckObj = TruckFactory.CreatePlayerTruck(cargoCount, currentPos, currentRot);
+        customizer = player.TruckObj.GetComponent<AIVehicleCustomiser>();
+        customizer.AssignCabLivery(liveryId, 0f);
+        var rigidbody = player.TruckObj.GetComponent<Rigidbody>();
+        rigidbody.detectCollisions = false;
+        var colliders = player.TruckObj.GetComponentsInChildren<Collider>();
+        foreach (var collider in colliders) DestroyImmediate(collider);
+        App.Log.LogInfo($"Recreated truck for player {netId} with cargo count {cargoCount}");
+    }
+
     private void HandleTruckLiveryUpdate(UpdateLiveryDto liveryDto)
     {
         _mainThreadContext.Post(new Action<Object>(_ =>
         {
             if (!_players.TryGetValue(liveryDto.NetId, out NetPlayer player)) return;
-
-            var applier = player.TruckExteriorObj.GetComponent<LiveryAndDamageApplierTruckExterior>();
-            applier?.LoadAndApplyLiveryById(liveryDto.Livery);
+            
+            var customiser = player.TruckObj.GetComponentInChildren<AIVehicleCustomiser>(true);
+            customiser.AssignCabLivery(liveryDto.Livery, 0f);
         }), null);
     }
 
@@ -173,25 +149,101 @@ public class NetworkEventsComponent : MonoBehaviour
 
             if (positionDto.IsTruck && player.TruckObj != null)
             {
-                player.TruckObj.transform.position = Vec(positionDto.Position);
-                player.TruckObj.transform.rotation = Quaternion.Euler(Vec(positionDto.Rotation));
-                var rigid = player.TruckObj.transform.GetComponent<Rigidbody>();
-                rigid?.velocity = Vec(positionDto.Velocity);
-                rigid?.angularVelocity = Vec(positionDto.AngVel);
+                var controller = player.TruckObj.GetComponent<TruckControllerComponent>();
+                if (controller != null)
+                    controller.ApplyNetworkState(
+                        Vec(positionDto.Position),
+                        Quat(positionDto.Rotation),
+                        Vec(positionDto.Velocity)
+                        );
+                else App.Log.LogError("TruckControllerComponent is NULL");
             }
             else if (!positionDto.IsTruck && player.PlayerObj != null)
             {
-                player.PlayerObj.transform.position = Vec(positionDto.Position);
-                player.PlayerObj.transform.rotation = Quaternion.Euler(Vec(positionDto.Rotation));
+                player.PlayerObj.transform.SetPositionAndRotation(
+                    Vec(positionDto.Position),
+                    Quat(positionDto.Rotation)
+                );
                 var rigid = player.PlayerObj.transform.GetComponent<Rigidbody>();
-                // why this can be null?
-                rigid?.velocity = Vec(positionDto.Velocity);
-                rigid?.angularVelocity = Vec(positionDto.AngVel);
+                if (rigid != null)
+                {
+                    rigid.velocity = Vec(positionDto.Velocity);
+                    rigid.angularVelocity = Vec(positionDto.AngVel);
+                }
             }
         }), null);
     }
 
-    private Vector3 Vec(global::StarTruckMP.Shared.Vector3 vec) => new(vec.X, vec.Y, vec.Z);
+    private static Vector3 Vec(global::StarTruckMP.Shared.Vector3 vec) => new(vec.X, vec.Y, vec.Z);
+    
+    private static Quaternion Quat(global::StarTruckMP.Shared.Quaternion quat) => new(quat.X, quat.Y, quat.Z, quat.W);
+    
+    private void HandleTrailerUpdate(UpdateTrailerDto trailerDto)
+    {
+        _mainThreadContext.Post(new Action<Object>(_ =>
+        {
+            if (!_players.TryGetValue(trailerDto.NetId, out NetPlayer player)) return;
+
+            App.Log.LogInfo($"Trailer update info for player {trailerDto.NetId}: TrailerCount=[{trailerDto.TrailerCount}], LiveryId='{trailerDto.LiveryId}', CargoTypeId='{trailerDto.CargoTypeId}'");
+            
+            RecreateNetPlayerTruck(trailerDto.NetId, trailerDto.TrailerCount);
+
+            if (trailerDto.TrailerCount == 0) return; // nothing to do
+            
+            var existingSlots = player.TruckObj.GetComponentsInChildren<AIVehicleContainerSlot>(true);
+            
+            foreach (var slot in existingSlots)
+            {
+                if (slot == null)
+                {
+                    App.Log.LogInfo($"Tried to spawn container for {trailerDto.NetId} but no AIVehicleContainerSlot found in truck hierarchy");
+                    return;
+                }
+                if (CargoMetadataProvider.instance == null)
+                {
+                    App.Log.LogError($"CargoMetadataProvider is null, cannot spawn container for {trailerDto.NetId}");
+                    return;
+                }
+                if (CargoMetadataProvider.instance.cargoCatalogue == null)
+                {
+                    App.Log.LogError($"CargoCatalogue is null, cannot spawn container for {trailerDto.NetId}");
+                    return;
+                }
+
+                CargoType cargoType = null;
+                if (!string.IsNullOrEmpty(trailerDto.CargoTypeId))
+                {
+                    if (!CargoMetadataProvider.instance.cargoCatalogue.lookUp.TryGetValue(trailerDto.CargoTypeId, out cargoType))
+                        App.Log.LogWarning($"GetById returned null for CargoTypeId '{trailerDto.CargoTypeId}', falling back to index 0");
+                }
+                cargoType ??= CargoMetadataProvider.instance.cargoCatalogue.GetByIndex(0);
+                if (cargoType == null)
+                {
+                    App.Log.LogError($"Cargo type at index 0 is null, cannot spawn container for {trailerDto.NetId}");
+                    return;
+                }
+                if (cargoType.container == null)
+                {
+                    App.Log.LogError($"cargoType.container is null for {trailerDto.NetId}, cannot spawn container");
+                    return;
+                }
+
+                var liveryAssetRef = CustomizationManager.instance.GetLiveryAssetRefFromId(trailerDto.LiveryId);
+                if (liveryAssetRef == null)
+                    App.Log.LogWarning($"GetLiveryAssetRefFromId returned null for livery ID '{trailerDto.LiveryId}', SpawnContainer may fail");
+
+                App.Log.LogInfo($"Spawning container for {trailerDto.NetId}: cargoType={cargoType}, container={cargoType.container}, liveryAssetRef={liveryAssetRef}");
+                
+                slot.SpawnContainer(new AIVehicleCustomizationData.CargoContainerData
+                {
+                    m_container = cargoType.container,
+                    m_cargoType = cargoType,
+                    m_containerLivery = liveryAssetRef,
+                    m_damagePercent = 0f
+                });
+            }
+        }), null);
+    }
 
     private void HandlePlayerSectorUpdate(UpdateSectorDto sectorDto)
     {
@@ -236,6 +288,21 @@ public class NetworkEventsComponent : MonoBehaviour
     {
         _connected = true;
         Network.SendServerMessage(new UpdateSectorCmd { Sector = PlayerState.Sector }, PacketType.UpdateSector);
+        
+        // Send livery
+        if (PlayerState.Truck != null)
+        {
+            var truckInfo = Utils.ExtractTruckInfo(PlayerState.Truck);
+            if (!string.IsNullOrEmpty(truckInfo.LiveryId))
+            {
+                Network.SendServerMessage(new UpdateLiveryCmd { Livery = truckInfo.LiveryId }, PacketType.UpdateLivery);
+                App.Log.LogInfo($"Sent livery to server: {truckInfo.LiveryId}");
+            }
+            else
+            {
+                App.Log.LogWarning("Could not extract livery from player truck, skipping livery update.");
+            }
+        }
     }
 
     private void Unsubscribe()
@@ -246,6 +313,7 @@ public class NetworkEventsComponent : MonoBehaviour
         Network.OnPlayerSectorUpdate -= HandlePlayerSectorUpdate;
         Network.OnPlayerPositionUpdate -= HandlePlayerPositionUpdate;
         Network.OnTruckLiveryUpdate -= HandleTruckLiveryUpdate;
+        Network.OnTrailerUpdate -= HandleTrailerUpdate;
     }
     
     private void OnDisable()

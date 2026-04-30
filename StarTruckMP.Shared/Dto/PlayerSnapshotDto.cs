@@ -10,5 +10,8 @@ public class PlayerSnapshotDto
     public string Livery { get; set; } = string.Empty;
     public TransformDto Player { get; set; } = new();
     public TransformDto Truck { get; set; } = new();
+    public int TrailersCount { get; set; }
+    public string TrailerLivery { get; set; } = string.Empty;
+    public string TrailerCargoTypeId { get; set; } = string.Empty;
 }
 

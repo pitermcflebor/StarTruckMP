@@ -1,6 +1,7 @@
 <script lang="ts">
     import {type GameMessage, onGameMessage, sendToGame} from "$lib/gameEvents";
     import ObjectInspector from "$lib/inspector/ObjectInspector.svelte";
+    import RunCode from "$lib/runcode/RunCode.svelte";
     
     let lastMessage = $state<GameMessage>({} as GameMessage);
     
@@ -17,6 +18,7 @@
 
 <div class="container">
     <ObjectInspector />
+    <!--<RunCode />-->
 </div>
 
 <style>

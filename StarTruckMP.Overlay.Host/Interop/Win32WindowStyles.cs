@@ -74,11 +74,25 @@ internal sealed class Win32WindowStyles
     public void FocusWindow(nint hwnd)
     {
         ClipCursor(IntPtr.Zero);
+
+        // AttachThreadInput is required to reliably steal keyboard focus from another
+        // process (e.g. the game). Without it, SetForegroundWindow fails silently on
+        // Windows Vista+ when called from a non-foreground process.
+        var foregroundHwnd = GetForegroundWindow();
+        var foregroundThread = GetWindowThreadProcessId(foregroundHwnd, out _);
+        var currentThread = GetCurrentThreadId();
+        var attached = foregroundThread != currentThread &&
+                       AttachThreadInput(foregroundThread, currentThread, true);
+
         ShowWindow(hwnd, SwShow);
         BringWindowToTop(hwnd);
         SetForegroundWindow(hwnd);
         SetActiveWindow(hwnd);
         SetFocus(hwnd);
+
+        if (attached)
+            AttachThreadInput(foregroundThread, currentThread, false);
+
         _logger.Info($"[Win32] FocusWindow hwnd=0x{hwnd:X}");
     }
 
@@ -149,5 +163,17 @@ internal sealed class Win32WindowStyles
 
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(nint hWnd, int nCmdShow);
+
+    [DllImport("user32.dll")]
+    private static extern nint GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(nint hWnd, out uint lpdwProcessId);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
+
+    [DllImport("user32.dll")]
+    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
 }
 

@@ -18,6 +18,7 @@ public class Network
     public static event Action<UpdateLiveryDto> OnTruckLiveryUpdate;
     public static event Action<UpdateSectorDto> OnPlayerSectorUpdate;
     public static event Action<int> OnPlayerDisconnected;
+    public static event Action<UpdateTrailerDto> OnTrailerUpdate; 
 
     private static bool _isInitialized;
     private static NetManager _client;
@@ -131,8 +132,12 @@ public class Network
             
             switch (packetType)
             {
+                // ordered by most common to less common
                 case PacketType.UpdatePosition:
                     HandlePositionUpdate(raw.Deserialize<UpdatePositionDto>());
+                    break;
+                case PacketType.UpdateTrailer:
+                    HandleTrailerUpdate(raw.Deserialize<UpdateTrailerDto>());
                     break;
                 case PacketType.UpdateLivery:
                     HandleUpdateLivery(raw.Deserialize<UpdateLiveryDto>());
@@ -206,6 +211,14 @@ public class Network
             NetId = snapshot.NetId,
             Livery = snapshot.Livery,
         });
+        
+        OnTrailerUpdate?.Invoke(new UpdateTrailerDto
+        {
+            NetId = snapshot.NetId,
+            TrailerCount = snapshot.TrailersCount,
+            LiveryId = snapshot.TrailerLivery,
+            CargoTypeId = snapshot.TrailerCargoTypeId
+        });
     }
 
     private static void HandleSyncPlayers(SyncPlayersDto syncPlayers)
@@ -241,6 +254,11 @@ public class Network
         _netId = welcome.NetId;
         OnConnected?.Invoke(_netId);
         App.Log.LogInfo("Handshake completed with server. NetId: " + _netId);
+    }
+
+    private static void HandleTrailerUpdate(UpdateTrailerDto trailer)
+    {
+        OnTrailerUpdate?.Invoke(trailer);
     }
 
     private static void ListenerOnNetworkErrorEvent(IPEndPoint endPoint, SocketError socketError)

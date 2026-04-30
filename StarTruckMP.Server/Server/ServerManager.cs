@@ -224,12 +224,15 @@ public class ServerManager
             case PacketType.UpdateLivery:
                 HandleUpdateLivery(packet.PeerId, player, packet.Raw);
                 break;
+            case PacketType.UpdateTrailer:
+                HandleUpdateTrailer(packet.PeerId, player, packet.Raw);
+                break;
             default:
                 _logger.LogWarning("Unhandled packet type {PacketType} from peer {PeerId}", packet.PacketType, packet.PeerId);
                 break;
         }
     }
-
+    
     private void ProcessOutgoingQueue()
     {
         var processed = 0;
@@ -286,7 +289,10 @@ public class ServerManager
                 Rotation = player.TruckRotation,
                 Velocity = player.TruckVelocity,
                 AngVel = player.TruckAngVel
-            }
+            },
+            TrailerLivery = player.TrailerLivery,
+            TrailersCount = player.TrailerCount,
+            TrailerCargoTypeId = player.TrailerCargoTypeId
         };
     }
 
@@ -410,6 +416,26 @@ public class ServerManager
         
         if (_logger.IsEnabled(LogLevel.Trace))
             _logger.LogTrace("Peer {peerId} updated livery to '{livery}'", peerId, liveryData.Livery);
+    }
+    
+    private void HandleUpdateTrailer(int packetPeerId, Player player, byte[] packetRaw)
+    {
+        var trailerData = PacketSerializer.Deserialize<UpdateTrailerCmd>(packetRaw);
+        player.TrailerCount = trailerData.TrailerCount;
+        player.TrailerLivery = trailerData.LiveryId;
+        player.TrailerCargoTypeId = trailerData.CargoTypeId;
+
+        var update = new UpdateTrailerDto
+        {
+            NetId = packetPeerId,
+            TrailerCount = trailerData.TrailerCount,
+            LiveryId = trailerData.LiveryId,
+            CargoTypeId = trailerData.CargoTypeId
+        };
+        QueueSendReliableToAllExcept(update.Serialize(PacketType.UpdateTrailer), packetPeerId);
+        
+        if (_logger.IsEnabled(LogLevel.Trace))
+            _logger.LogTrace("Peer {peerId} updated trailer, count {count} with livery {livery}", packetPeerId, trailerData.TrailerCount, trailerData.LiveryId);
     }
 
     private void QueueSendReliableToAllExcept(byte[] payload, int exceptPeerId)

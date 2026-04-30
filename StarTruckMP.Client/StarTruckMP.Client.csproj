@@ -24,12 +24,17 @@
         <PackageReference Include="BepInEx.Unity.IL2CPP" Version="6.0.0-be.*" IncludeAssets="compile"/>
         <PackageReference Include="BepInEx.PluginInfoProps" Version="2.*"/>
         <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.7" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.9.2" />
     </ItemGroup>
 
     <ItemGroup>
         <!-- $(StarTruckBepInExSteam) = (STEAM VERSION) your BepInEx folder inside the games folder -->
         <Reference Include="com.rlabrecque.steamworks.net">
             <HintPath>$(StarTruckBepInExSteam)\interop\com.rlabrecque.steamworks.net.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="Unity.Addressables">
+            <HintPath>$(StarTruckBepInEx)\interop\Unity.Addressables.dll</HintPath>
             <Private>False</Private>
         </Reference>
         <!-- $(StarTruckBepInEx) = your BepInEx folder inside the games folder -->

@@ -8,8 +8,9 @@ using System.Threading;
 using StarTruckMP.Client.Synchronization;
 using StarTruckMP.Client.UI;
 using StarTruckMP.Shared;
-using StarTruckMP.Shared.Dto;
+using StarTruckMP.Shared.Cmd;
 using UnityEngine;
+using Quaternion = UnityEngine.Quaternion;
 using Vector3 = UnityEngine.Vector3;
 
 namespace StarTruckMP.Client.Components;
@@ -32,8 +33,12 @@ public class GameEventsComponent : MonoBehaviour
                     break;
             }
         };
+
+        Network.OnConnected += netId => Connected();
     }
 
+    private bool _loaded;
+    
     private GameObject _player;
     private GameObject _playerCam;
     private Rigidbody _playerRigid;
@@ -41,6 +46,7 @@ public class GameEventsComponent : MonoBehaviour
 
     private GameObject _truck;
     private Rigidbody _truckRigid;
+    private StarTruck _starTruck;
     
     private void OnArrivedAtSector(Il2CppSystem.Object sender, Il2CppSystem.EventArgs args)
     {
@@ -48,6 +54,8 @@ public class GameEventsComponent : MonoBehaviour
         ArrivedAtSector?.Invoke(PlayerState.Sector);
         
         // This event also happens when the player load a saved game
+        if (_loaded) return;
+        _loaded = true;
         
         _player = GameObject.FindGameObjectWithTag("Player");
         PlayerState.Player = _player;
@@ -64,10 +72,77 @@ public class GameEventsComponent : MonoBehaviour
         if (suit && suit.childCount > 0) 
             PlayerState.SpaceSuit = suit.GetChild(0).gameObject;
 
+        if (_truck != null)
+        {
+            _starTruck = _truck.GetComponentInChildren<StarTruck>();
+            _starTruck.maglockConnector.hitchControl.onTriggered += new System.Action<Il2CppSystem.Object, Il2CppSystem.EventArgs>((s, e) =>
+            {
+                if (_starTruck.maglockConnector.hitchedCargo)
+                    OnHitchCargo(_starTruck.maglockConnector.hitchedCargo);
+                else
+                    OnUnhitchCargo();
+            });
+        }
+
         if (!_pptRunning) PlayerPositionThread();
         if (!_tptRunning) TruckPositionThread();
     }
-    
+
+    private void Connected()
+    {
+        // we already have something attached
+        if (_starTruck.maglockConnector.hitched)
+        {
+            OnHitchCargo(_starTruck.maglockConnector.hitchedCargo);
+        }
+    }
+
+    private void OnUnhitchCargo()
+    {
+        App.Log.LogInfo("Unhitched cargo");
+        // we unhitched a cargo, we need to notify the server
+        Network.SendServerMessage(new UpdateTrailerCmd()
+        {
+            TrailerCount = 0,
+            LiveryId = null
+        }, PacketType.UpdateTrailer);
+    }
+
+    private void OnHitchCargo(CargoContainer cargo)
+    {
+        App.Log.LogInfo("Hitched cargo");
+        // we hitched a cargo, we need to retrieve the cargo size, livery and share it to the server
+        var trailersCount = _starTruck.HitchedTrailersCount;
+        var livery = cargo.damageApplier.CurrentLiveryId ?? cargo.damageApplier.AppliedLiveryId;
+
+        if (string.IsNullOrEmpty(livery)) 
+            App.Log.LogError("Couldn't retrieve livery for hitched cargo, sending null");
+
+        var cargoType = cargo.cargoRecord?.cargoType;
+        string cargoTypeId = null;
+        
+        foreach (var kvp in CargoMetadataProvider.instance.cargoCatalogue.lookUp)
+        {
+            if (kvp.value._displayNameId == cargoType._displayNameId)
+            {
+                cargoTypeId = kvp.key;
+                break;
+            }
+        }
+        
+        if (string.IsNullOrWhiteSpace(cargoTypeId))
+            App.Log.LogError("Couldn't retrieve cargoTypeId for hitched cargo, sending null");
+        
+        App.Log.LogInfo($"Cargo data: {trailersCount}, {livery}, {cargoTypeId}");
+        
+        Network.SendServerMessage(new UpdateTrailerCmd()
+        {
+            TrailerCount = trailersCount,
+            LiveryId = livery,
+            CargoTypeId = cargoTypeId
+        }, PacketType.UpdateTrailer);
+    }
+
     private bool _subscribedToSectorArrival = false;
     
     private void Update()
@@ -293,14 +368,13 @@ public class GameEventsComponent : MonoBehaviour
                     continue;
                 }
                 
-                var newPlayerPosition = _player.transform.position;
-                if (Vector3.Distance(lastPosition, newPlayerPosition) > ThresholdChange)
+                _player.transform.GetPositionAndRotation(out var position, out var rotation);
+                if (Vector3.Distance(lastPosition, position) > ThresholdChange)
                 {
-                    Network.SendServerMessage(new UpdatePositionDto
+                    Network.SendServerMessage(new UpdatePositionCmd
                     {
-                        NetId = Network.NetId,
-                        Position = ConvertToSharedVector3(newPlayerPosition),
-                        Rotation = ConvertToSharedVector3(_player.transform.rotation.eulerAngles),
+                        Position = ConvertToSharedVector3(position),
+                        Rotation = ConvertToSharedQuaternion(rotation),
                         Velocity = ConvertToSharedVector3(_playerRigid.velocity),
                         AngVel = ConvertToSharedVector3(_playerRigid.angularVelocity),
                         IsTruck = false,
@@ -341,14 +415,13 @@ public class GameEventsComponent : MonoBehaviour
                     continue;
                 }
                 
-                var newTruckPosition = _truck.transform.position;
-                if (Vector3.Distance(lastPosition, newTruckPosition) > ThresholdChange)
+                _truck.transform.GetPositionAndRotation(out var position, out var rotation);
+                if (Vector3.Distance(lastPosition, position) > ThresholdChange)
                 {
-                    Network.SendServerMessage(new UpdatePositionDto
+                    Network.SendServerMessage(new UpdatePositionCmd
                     {
-                        NetId = Network.NetId,
-                        Position = ConvertToSharedVector3(newTruckPosition),
-                        Rotation = ConvertToSharedVector3(_truck.transform.rotation.eulerAngles),
+                        Position = ConvertToSharedVector3(position),
+                        Rotation = ConvertToSharedQuaternion(rotation),
                         Velocity = ConvertToSharedVector3(_truckRigid.velocity),
                         AngVel = ConvertToSharedVector3(_truckRigid.angularVelocity),
                         IsTruck = true,
@@ -374,25 +447,29 @@ public class GameEventsComponent : MonoBehaviour
             Z = unityVector.z
         };
     }
-    
-    private void OnEnable()
+
+    private StarTruckMP.Shared.Quaternion ConvertToSharedQuaternion(Quaternion unityQuaternion)
     {
-        App.Log.LogInfo("ConnectionComponent OnEnable");
+        return new Shared.Quaternion()
+        {
+            X = unityQuaternion.x,
+            Y = unityQuaternion.y,
+            Z = unityQuaternion.z,
+            W = unityQuaternion.w
+        };
     }
 
     #region Recycle
     
     private void OnDestroy()
     {
-        App.Log.LogInfo("ConnectionComponent destroyed");
-        SectorPersistence.instance.onArrivedAtSector.onTriggered -=
-            new System.Action<Il2CppSystem.Object, Il2CppSystem.EventArgs>(OnArrivedAtSector);
+        _cts.Cancel();
     }
 
     private void OnDisable()
     {
-        SectorPersistence.instance.onArrivedAtSector.onTriggered -=
-            new System.Action<Il2CppSystem.Object, Il2CppSystem.EventArgs>(OnArrivedAtSector);
+        if (!_cts.IsCancellationRequested)
+            _cts.Cancel();
     }
     
     #endregion

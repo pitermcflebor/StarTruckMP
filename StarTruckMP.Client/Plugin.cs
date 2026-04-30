@@ -14,6 +14,7 @@ using Il2CppInterop.Runtime;
 using Il2CppInterop.Runtime.Injection;
 using StarTruckMP.Client.Authentication;
 using StarTruckMP.Client.Components;
+using StarTruckMP.Client.Patches;
 using StarTruckMP.Client.Synchronization;
 using StarTruckMP.Client.UI;
 using StarTruckMP.Shared.Cmd.Api;
@@ -48,8 +49,11 @@ public class Plugin : BasePlugin
         SetupUI();
 
         Network.SetupConnection();
-
+        
         Harmony.CreateAndPatchAll(typeof(ClientHooks));
+        Harmony.CreateAndPatchAll(typeof(AIVehicleTruck_Patch));
+        Harmony.CreateAndPatchAll(typeof(AIVehicleDef_Patch));
+        
         Log.LogInfo($"Plugin {PluginInfo.PLUGIN_GUID} loaded.");
         
         #if DEBUG
@@ -69,10 +73,13 @@ public class Plugin : BasePlugin
 
     private void SetupComponents()
     {
+        ClassInjector.RegisterTypeInIl2Cpp<TruckControllerComponent>();
         ClassInjector.RegisterTypeInIl2Cpp<GameEventsComponent>();
         ClassInjector.RegisterTypeInIl2Cpp<NetworkEventsComponent>();
+        ClassInjector.RegisterTypeInIl2Cpp<RunCodeComponent>();
         AddComponent<GameEventsComponent>();
         AddComponent<NetworkEventsComponent>();
+        AddComponent<RunCodeComponent>();
     }
 
     #region Steam auth
@@ -212,7 +219,8 @@ public class Plugin : BasePlugin
     private static readonly string[] ManagedAssemblyNames =
     [
         "System.Collections.Immutable",
-        "Microsoft.Extensions.Primitives"
+        "Microsoft.Extensions.Primitives",
+        "System.Reflection.Metadata"
     ];
 
     private static void HookAssemblyResolver()
