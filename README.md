@@ -37,3 +37,7 @@ Anyone willing to contribute feel free to jump in!
 
 - [JayJay34](https://github.com/JayJay34) - who started the project
 - [BepInEx](https://github.com/bepinex/bepinex) - the framework that makes everything possible
+- [rnnoise](https://github.com/xiph/rnnoise) - library to reduce noise on PTT
+- [RNNoise.Net](https://github.com/Yellow-Dog-Man/RNNoise.Net) - api for .NET to run rnnoise
+- [NWaves](https://github.com/ar1st0crat/NWaves) - library used to make DSP in .NET
+- [Concentus](https://github.com/lostromb/concentus) - api for .NET to run Opus encoder/decoder
