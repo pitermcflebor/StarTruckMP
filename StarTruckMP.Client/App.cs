@@ -8,11 +8,17 @@ public static class App
 {
     public static ConfigEntry<string> ServerAddress;
     public static ConfigEntry<string> ServerPort;
+    public static ConfigEntry<string> MicrophoneDeviceName;
+    public static ConfigEntry<bool> PreferSystemDefaultMicrophone;
+    public static ConfigEntry<float> RadioEffectOutputGain;
 
     public static void Configure(ConfigFile config)
     {
         ServerAddress = config.Bind("Connection", "ServerAddress", "127.0.0.1", "StarTruckMP server address");
         ServerPort = config.Bind("Connection", "ServerPort", "7777", "StarTruckMP server port");
+        MicrophoneDeviceName = config.Bind("Audio", "MicrophoneDeviceName", string.Empty, "Exact microphone device name to use. Leave empty to auto-select.");
+        PreferSystemDefaultMicrophone = config.Bind("Audio", "PreferSystemDefaultMicrophone", true, "When auto-selecting, try the Windows default microphone before explicit devices.");
+        RadioEffectOutputGain = config.Bind("Audio", "RadioEffectOutputGain", 1.0f, "Final output gain applied after the NWaves radio voice effect.");
     }
 
     public static ManualLogSource Log;

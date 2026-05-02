@@ -39,7 +39,7 @@ public class Plugin : BasePlugin
         // For some reason the assembly System.Collections.Immutable is not being autoloaded by the runtime,
         // so we need to force this behavior.
         HookAssemblyResolver();
-
+        
         App.Log = Log;
         App.Configure(Config);
 
@@ -77,6 +77,8 @@ public class Plugin : BasePlugin
         ClassInjector.RegisterTypeInIl2Cpp<GameEventsComponent>();
         ClassInjector.RegisterTypeInIl2Cpp<NetworkEventsComponent>();
         ClassInjector.RegisterTypeInIl2Cpp<RunCodeComponent>();
+        ClassInjector.RegisterTypeInIl2Cpp<CbRadioPttComponent>();
+        ClassInjector.RegisterTypeInIl2Cpp<CbRadioSpeakerComponent>();
         AddComponent<GameEventsComponent>();
         AddComponent<NetworkEventsComponent>();
         AddComponent<RunCodeComponent>();

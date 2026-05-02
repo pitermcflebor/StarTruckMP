@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using LiteNetLib;
+using LiteNetLib.Utils;
 using StarTruckMP.Client.Components;
 using StarTruckMP.Shared;
 using StarTruckMP.Shared.Cmd;
@@ -18,7 +19,8 @@ public class Network
     public static event Action<UpdateLiveryDto> OnTruckLiveryUpdate;
     public static event Action<UpdateSectorDto> OnPlayerSectorUpdate;
     public static event Action<int> OnPlayerDisconnected;
-    public static event Action<UpdateTrailerDto> OnTrailerUpdate; 
+    public static event Action<UpdateTrailerDto> OnTrailerUpdate;
+    public static event Action<VoiceDto> OnVoiceReceived;
 
     private static bool _isInitialized;
     private static NetManager _client;
@@ -64,6 +66,18 @@ public class Network
             App.Log.LogError("Failed to send message to server:");
             App.Log.LogError(e);
         }
+    }
+
+    /// <summary>
+    /// Do not use this for normal messages
+    /// </summary>
+    /// <param name="opusFrame"></param>
+    public static void SendOpusFrame(byte[] opusFrame)
+    {
+        var write = new NetDataWriter();
+        write.Put((byte)PacketType.Voice);
+        write.Put(opusFrame);
+        _server.Send(write, DeliveryMethod.Unreliable);
     }
 
     private static void Polling()
@@ -127,7 +141,7 @@ public class Network
                 !_handshakeCompleted)
                 return;
 
-            if (packetType != PacketType.UpdatePosition)
+            if (packetType is not PacketType.UpdatePosition and not PacketType.Voice)
                 App.Log.LogInfo($"Packet:{packetType} in {raw.Length} bytes");
             
             switch (packetType)
@@ -135,6 +149,9 @@ public class Network
                 // ordered by most common to less common
                 case PacketType.UpdatePosition:
                     HandlePositionUpdate(raw.Deserialize<UpdatePositionDto>());
+                    break;
+                case PacketType.Voice:
+                    HandleVoice(raw);
                     break;
                 case PacketType.UpdateTrailer:
                     HandleTrailerUpdate(raw.Deserialize<UpdateTrailerDto>());
@@ -174,6 +191,12 @@ public class Network
         {
             reader.Recycle();
         }
+    }
+
+    private static void HandleVoice(byte[] raw)
+    {
+        var dto = raw.Deserialize<VoiceDto>();
+        OnVoiceReceived?.Invoke(dto);
     }
 
     private static void HandlePlayerDisconnected(PlayerDisconnectedDto disconnected)

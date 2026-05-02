@@ -67,7 +67,8 @@ public class RunCodeComponent : MonoBehaviour
                     .Where(a => !a.IsDynamic && !string.IsNullOrEmpty(a.Location));
                 var options = ScriptOptions.Default
                     .WithReferences(assemblies)
-                    .WithImports("System", "UnityEngine", "StarTruckMP.Client");
+                    .WithImports("System", "UnityEngine", "StarTruckMP.Client", "StarTruckMP.Client.UI", 
+                        "StarTruckMP.Client.Synchronization", "StarTruckMP.Client.Patches", "StarTruckMP.Client.Components");
 
                 globals.Log("Executing script on the Unity main thread.");
                 CSharpScript.RunAsync(code, options, globals, typeof(ScriptGlobals)).GetAwaiter().GetResult();

@@ -64,6 +64,7 @@ public class GameEventsComponent : MonoBehaviour
         _playerLocation = _player?.GetComponent<PlayerLocation>();
         
         _truck = GameObject.Find("StarTruck(Clone)"); // clone?
+        _truck.AddComponent<CbRadioPttComponent>();
         PlayerState.Truck = _truck;
         _truckRigid = _truck?.GetComponent<Rigidbody>();
         var truckInterior = _truck?.transform.Find("Interior");

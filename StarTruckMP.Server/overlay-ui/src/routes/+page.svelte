@@ -3,17 +3,7 @@
     import ObjectInspector from "$lib/inspector/ObjectInspector.svelte";
     import RunCode from "$lib/runcode/RunCode.svelte";
     
-    let lastMessage = $state<GameMessage>({} as GameMessage);
-    
-    onGameMessage((message => {
-        lastMessage = message;
-    }));
-    
     sendToGame("overlayLoaded", { timestamp: Date.now() });
-    
-    function testBtn() {
-        sendToGame("testButtonClicked", { timestamp: Date.now() });
-    }
 </script>
 
 <div class="container">

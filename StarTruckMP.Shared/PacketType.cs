@@ -12,6 +12,7 @@
         ProtocolWelcome,
         ProtocolMismatch,
         ProtocolAuthenticate,
-        UpdateTrailer
+        UpdateTrailer,
+        Voice
     }
 }

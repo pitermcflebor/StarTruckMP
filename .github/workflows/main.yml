@@ -35,10 +35,11 @@ jobs:
           npm ci
           npm run build
 
-      - name: Publish Client
+      - name: Publish Client win x64
         run: |
           dotnet publish StarTruckMP.Client/StarTruckMP.Client.csproj \
             -c Release \
+            -r win-x64 \
             -p:EnableWindowsTargeting=true \
             -o ./artifacts/client
 
@@ -82,7 +83,7 @@ jobs:
       - name: Compress artifacts
         run: |
           echo '{}' > ./artifacts/server-docker/settings.json
-          cd ./artifacts/client        && zip -r ../../StarTruckMP-bepinex-plugin.zip .   && cd ../..
+          cd ./artifacts/client        && zip -r ../../StarTruckMP-bepinex-plugin-win-x64.zip .   && cd ../..
           cd ./artifacts/server-win    && zip -r ../../StarTruckMP-server-win-x64.zip .   && cd ../..
           cd ./artifacts/server-linux  && zip -r ../../StarTruckMP-server-linux-x64.zip . && cd ../..
           cd ./artifacts/server-docker && zip -r ../../StarTruckMP-server-docker.zip .    && cd ../..
@@ -94,7 +95,7 @@ jobs:
           name: "Alpha v0.${{ github.event.inputs.version || github.run_number }}"
           generate_release_notes: true
           files: |
-            StarTruckMP-bepinex-plugin.zip
+            StarTruckMP-bepinex-plugin-win-x64.zip
             StarTruckMP-server-win-x64.zip
             StarTruckMP-server-linux-x64.zip
             StarTruckMP-server-docker.zip

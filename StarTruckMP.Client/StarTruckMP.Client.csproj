@@ -18,13 +18,23 @@
     <PropertyGroup Condition="'$(Configuration)'=='Release'">
         <DebugSymbols>False</DebugSymbols>
         <DebugType>None</DebugType>
+        <PlatformTarget>x64</PlatformTarget>
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+      <PlatformTarget>x64</PlatformTarget>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="BepInEx.Unity.IL2CPP" Version="6.0.0-be.*" IncludeAssets="compile"/>
-        <PackageReference Include="BepInEx.PluginInfoProps" Version="2.*"/>
+        <PackageReference Include="BepInEx.Unity.IL2CPP" Version="6.0.0-be.*" IncludeAssets="compile" />
+        <PackageReference Include="BepInEx.PluginInfoProps" Version="2.*" />
+        <PackageReference Include="Concentus" Version="2.2.2" />
+        <PackageReference Include="Concentus.Native" Version="1.5.2" />
+        <PackageReference Include="Concentus.Native.NetCore" Version="1.5.2" />
         <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.7" />
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.9.2" />
+        <PackageReference Include="NWaves" Version="0.9.6" />
+        <PackageReference Include="YellowDogMan.RRNoise.NET" Version="0.1.9" />
     </ItemGroup>
 
     <ItemGroup>
@@ -33,11 +43,15 @@
             <HintPath>$(StarTruckBepInExSteam)\interop\com.rlabrecque.steamworks.net.dll</HintPath>
             <Private>False</Private>
         </Reference>
+        <!-- $(StarTruckBepInEx) = your BepInEx folder inside the games folder -->
+        <Reference Include="UnityEngine.AudioModule">
+            <HintPath>$(StarTruckBepInEx)\interop\UnityEngine.AudioModule.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
         <Reference Include="Unity.Addressables">
             <HintPath>$(StarTruckBepInEx)\interop\Unity.Addressables.dll</HintPath>
             <Private>False</Private>
         </Reference>
-        <!-- $(StarTruckBepInEx) = your BepInEx folder inside the games folder -->
         <Reference Include="UnityEngine.AssetBundleModule">
             <HintPath>$(StarTruckBepInEx)\interop\UnityEngine.AssetBundleModule.dll</HintPath>
             <Private>False</Private>
@@ -136,20 +150,18 @@
         <OverlayHostOutputDir>..\StarTruckMP.Overlay.Host\bin\$(Configuration)\net10.0-windows10.0.19041.0\win-x64</OverlayHostOutputDir>
     </PropertyGroup>
 
+    <Target Name="_RemovePublishDirBeforePublishing" BeforeTargets="BeforePublish">
+        <RemoveDir Directories="$(PublishDir)" Condition="'$(PublishDir)' != ''" />
+    </Target>
+
     <Target Name="BuildAndStageOverlayHost" AfterTargets="Build">
-        <MSBuild Projects="..\StarTruckMP.Overlay.Host\StarTruckMP.Overlay.Host.csproj"
-                 Targets="Restore;Build"
-                 Properties="Configuration=$(Configuration);NuGetPackageRoot=$(NuGetPackageRoot);EnableWindowsTargeting=$(EnableWindowsTargeting)"
-                 RemoveProperties="TargetFramework;TargetFrameworks;RuntimeIdentifier;PublishDir;PublishProfile;PublishUrl;SelfContained;PublishSingleFile;PublishTrimmed;PublishReadyToRun" />
 
         <ItemGroup>
             <OverlayHostFiles Include="$(OverlayHostOutputDir)\**\*.*" />
         </ItemGroup>
 
         <MakeDir Directories="$(TargetDir)overlay" />
-        <Copy SourceFiles="@(OverlayHostFiles)"
-              DestinationFiles="@(OverlayHostFiles->'$(TargetDir)overlay\%(RecursiveDir)%(Filename)%(Extension)')"
-              SkipUnchangedFiles="true" />
+        <Copy SourceFiles="@(OverlayHostFiles)" DestinationFiles="@(OverlayHostFiles->'$(TargetDir)overlay\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
     </Target>
 
     <Target Name="IncludeOverlayHostInPublish" BeforeTargets="ComputeFilesToPublish">

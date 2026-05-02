@@ -15,6 +15,7 @@ namespace StarTruckMP.Server.Server;
 public class ServerManager
 {
     private const byte ReliableChannel = 0;
+    private const byte VoiceChannel = 0;  // Must match client. LiteNetLib default ChannelsCount=1 (only ch.0).
     private const int MaxIncomingPacketsPerTick = 256;
     private const int MaxOutgoingPacketsPerTick = 512;
 
@@ -218,6 +219,9 @@ public class ServerManager
             case PacketType.UpdatePosition:
                 HandleUpdatePosition(packet.PeerId, player, packet.Raw, packet.Channel, packet.DeliveryMethod);
                 break;
+            case PacketType.Voice:
+                HandleVoice(packet.PeerId, player, packet.Raw);
+                break;
             case PacketType.UpdateSector:
                 HandleUpdateSector(packet.PeerId, player, packet.Raw);
                 break;
@@ -232,7 +236,15 @@ public class ServerManager
                 break;
         }
     }
-    
+
+    private void HandleVoice(int packetPeerId, Player player, byte[] packetRaw)
+    {
+        // Wrap raw Opus bytes with sender's NetId so each receiver knows who is speaking.
+        // Use Unreliable delivery: voice must not block on retransmissions; late/lost frames are simply skipped.
+        var dto = new VoiceDto { NetId = packetPeerId, OpusData = packetRaw };
+        QueueSendToAllExcept(dto.Serialize(PacketType.Voice), packetPeerId, VoiceChannel, DeliveryMethod.Unreliable);
+    }
+
     private void ProcessOutgoingQueue()
     {
         var processed = 0;

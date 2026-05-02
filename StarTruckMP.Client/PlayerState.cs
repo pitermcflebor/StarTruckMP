@@ -20,5 +20,4 @@ public static class PlayerState
     public static Material[] SpaceSuitMats { get; set; }
 
     #endregion
-
 }
