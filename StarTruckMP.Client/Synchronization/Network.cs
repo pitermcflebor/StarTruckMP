@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Threading;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using StarTruckMP.Client.Components;
+using StarTruckMP.Client.Crypto;
 using StarTruckMP.Shared;
 using StarTruckMP.Shared.Cmd;
 using StarTruckMP.Shared.Dto;
@@ -27,7 +29,13 @@ public class Network
     private static NetPeer _server;
     private static bool _handshakeCompleted = false;
     private static int _netId = -1;
-    
+
+    // ── Encryption ────────────────────────────────────────────────────────────
+    /// <summary>Ephemeral ECDH key pair generated before connecting. Disposed after session key derivation.</summary>
+    private static ECDiffieHellman? _ephemeralKey;
+    /// <summary>ChaCha20-Poly1305 session cipher, ready after <see cref="HandleWelcome"/>.</summary>
+    private static SessionCipher? _sessionCipher;
+
     public static int NetId => _netId;
     
     /// <summary>
@@ -51,13 +59,23 @@ public class Network
     {
         try
         {
-            _server.Send(data.Serialize(packetType), packetType switch
+            var deliveryMethod = packetType switch
             {
                 PacketType.UpdatePosition => DeliveryMethod.Unreliable,
-                PacketType.ProtocolHello => DeliveryMethod.ReliableOrdered,
-                _ => DeliveryMethod.ReliableSequenced
-            });
-            
+                PacketType.ProtocolHello  => DeliveryMethod.ReliableOrdered,
+                _                         => DeliveryMethod.ReliableSequenced
+            };
+
+            // ProtocolHello is sent before the cipher exists - always plaintext.
+            if (packetType == PacketType.ProtocolHello || _sessionCipher is null)
+            {
+                _server.Send(data.Serialize(packetType), deliveryMethod);
+            }
+            else
+            {
+                _server.Send(BuildEncryptedPacket(data.Serialize(packetType)), deliveryMethod);
+            }
+
             if (packetType != PacketType.UpdatePosition)
                 App.Log.LogInfo($"Packet:{packetType} out {data.Serialize(packetType).Length} bytes");
         }
@@ -68,16 +86,34 @@ public class Network
         }
     }
 
-    /// <summary>
-    /// Do not use this for normal messages
-    /// </summary>
-    /// <param name="opusFrame"></param>
+    /// <summary>Do not use this for normal messages.</summary>
     public static void SendOpusFrame(byte[] opusFrame)
     {
-        var write = new NetDataWriter();
-        write.Put((byte)PacketType.Voice);
-        write.Put(opusFrame);
-        _server.Send(write, DeliveryMethod.Unreliable);
+        if (_sessionCipher is null)
+        {
+            // Cipher not ready yet - drop the frame; it will be missed but that's acceptable.
+            return;
+        }
+
+        // Build plaintext: [1-byte PacketType][opus bytes]
+        var plain = new byte[1 + opusFrame.Length];
+        plain[0] = (byte)PacketType.Voice;
+        opusFrame.CopyTo(plain, 1);
+
+        _server.Send(BuildEncryptedPacket(plain), DeliveryMethod.Unreliable);
+    }
+
+    /// <summary>
+    /// Wraps <paramref name="serializedPacket"/> (which already contains the 1-byte PacketType header)
+    /// in an EncryptedPayload frame using the current session cipher.
+    /// </summary>
+    private static byte[] BuildEncryptedPacket(byte[] serializedPacket)
+    {
+        var encrypted = _sessionCipher!.Encrypt(serializedPacket);
+        var frame = new byte[1 + encrypted.Length];
+        frame[0] = (byte)PacketType.EncryptedPayload;
+        encrypted.CopyTo(frame, 1);
+        return frame;
     }
 
     private static void Polling()
@@ -100,6 +136,10 @@ public class Network
             listener.NetworkReceiveEvent += ListenerOnNetworkReceiveEvent;
             
             _client.Start();
+
+            // Generate ephemeral ECDH key pair before connecting.
+            _ephemeralKey?.Dispose();
+            _ephemeralKey = ClientKeyExchange.GenerateEphemeralKeyPair();
 
             var data = new ProtocolAuthenticateCmd
             {
@@ -134,8 +174,37 @@ public class Network
     {
         try
         {
-            var packetType = (PacketType)reader.GetByte();
-            var raw = reader.GetRemainingBytes();
+            var firstByte = reader.GetByte();
+            var packetType = (PacketType)firstByte;
+
+            byte[] raw;
+
+            if (packetType == PacketType.EncryptedPayload)
+            {
+                if (_sessionCipher is null)
+                {
+                    App.Log.LogError("Received EncryptedPayload but session cipher is not ready - dropping.");
+                    return;
+                }
+
+                var encFrame = reader.GetRemainingBytes();
+                try
+                {
+                    var plaintext = _sessionCipher.Decrypt(encFrame);
+                    if (plaintext.Length < 1) return;
+                    packetType = (PacketType)plaintext[0];
+                    raw = plaintext[1..];
+                }
+                catch (CryptographicException ex)
+                {
+                    App.Log.LogError("Decryption failed: " + ex.Message);
+                    return;
+                }
+            }
+            else
+            {
+                raw = reader.GetRemainingBytes();
+            }
 
             if (packetType is not PacketType.ProtocolWelcome and not PacketType.ProtocolMismatch &&
                 !_handshakeCompleted)
@@ -273,6 +342,32 @@ public class Network
 
     private static void HandleWelcome(ProtocolWelcomeDto welcome)
     {
+        // Derive session key from the server's public key received during HTTPS auth.
+        if (_ephemeralKey is not null && PlayerState.ServerPublicKey is { Length: > 0 })
+        {
+            try
+            {
+                var sessionKey = ClientKeyExchange.DeriveSessionKey(_ephemeralKey, PlayerState.ServerPublicKey);
+                _sessionCipher?.Dispose();
+                _sessionCipher = new SessionCipher(sessionKey);
+                App.Log.LogInfo("[Crypto] Session cipher established.");
+            }
+            catch (Exception ex)
+            {
+                App.Log.LogError("[Crypto] Failed to derive session key: " + ex.Message);
+            }
+            finally
+            {
+                _ephemeralKey.Dispose();
+                _ephemeralKey = null;
+                PlayerState.ServerPublicKey = null;
+            }
+        }
+        else
+        {
+            App.Log.LogWarning("[Crypto] No ephemeral key or server public key available - UDP traffic will be unencrypted.");
+        }
+
         _handshakeCompleted = true;
         _netId = welcome.NetId;
         OnConnected?.Invoke(_netId);
@@ -299,8 +394,16 @@ public class Network
     private static void ListenerOnPeerConnectedEvent(NetPeer peer)
     {
         _handshakeCompleted = false;
+        _sessionCipher?.Dispose();
+        _sessionCipher = null;
 
-        var hello = new ProtocolHelloCmd() { ProtocolVersion = NetProtocol.CurrentVersion };
+        var hello = new ProtocolHelloCmd
+        {
+            ProtocolVersion = NetProtocol.CurrentVersion,
+            ClientPublicKey = _ephemeralKey is not null
+                ? ClientKeyExchange.ExportPublicKeyBytes(_ephemeralKey)
+                : Array.Empty<byte>()
+        };
         SendServerMessage(hello, PacketType.ProtocolHello);
         App.Log.LogInfo($"Connected to server {peer.Address}:{peer.Port}, waiting for handshake...");
     }

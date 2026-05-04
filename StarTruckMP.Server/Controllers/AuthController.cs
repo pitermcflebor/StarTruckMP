@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using StarTruckMP.Server.Controllers.Services;
+using StarTruckMP.Server.Crypto;
 using StarTruckMP.Shared.Cmd.Api;
 using StarTruckMP.Shared.Dto.Api;
 
@@ -12,17 +13,20 @@ public sealed class AuthController : ControllerBase
     private readonly AuthService _authService;
     private readonly XboxTokenValidator _xboxValidator;
     private readonly SteamTicketValidator _steamValidator;
+    private readonly ServerKeyPair _serverKeyPair;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
         AuthService authService,
         XboxTokenValidator xboxValidator,
         SteamTicketValidator steamValidator,
+        ServerKeyPair serverKeyPair,
         ILogger<AuthController> logger)
     {
         _authService = authService;
         _xboxValidator = xboxValidator;
         _steamValidator = steamValidator;
+        _serverKeyPair = serverKeyPair;
         _logger = logger;
     }
 
@@ -61,7 +65,11 @@ public sealed class AuthController : ControllerBase
         // 3. Issue a session token bound to this player
         var sessionToken = _authService.IssueXboxSessionToken(cmd.Xuid, cmd.Gamertag);
 
-        return Ok(new TicketAuthenticationDto { Token = sessionToken });
+        return Ok(new TicketAuthenticationDto
+        {
+            Token = sessionToken,
+            ServerPublicKey = Convert.ToBase64String(_serverKeyPair.PublicKeyBytes)
+        });
     }
 
     [HttpPost("steam")]
@@ -99,6 +107,10 @@ public sealed class AuthController : ControllerBase
         // 3. Issue a session token bound to this Steam player
         var sessionToken = _authService.IssueSteamSessionToken(cmd.SteamId);
 
-        return Ok(new TicketAuthenticationDto { Token = sessionToken });
+        return Ok(new TicketAuthenticationDto
+        {
+            Token = sessionToken,
+            ServerPublicKey = Convert.ToBase64String(_serverKeyPair.PublicKeyBytes)
+        });
     }
 }

@@ -1,4 +1,6 @@
-﻿namespace StarTruckMP.Server.Entities;
+﻿using StarTruckMP.Server.Crypto;
+
+namespace StarTruckMP.Server.Entities;
 
 /// <summary>
 /// This contains the player information, it shouldn't be constructed.
@@ -10,6 +12,14 @@ public class Player(int id)
     public ushort ProtocolVersion { get; set; }
     public string Sector { get; set; } = "none";
     public string Livery { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Per-player ChaCha20-Poly1305 session cipher, available after the ECDH handshake.
+    /// </summary>
+    public SessionCipher? Cipher { get; set; }
+
+    /// <summary>True when the network handshake and key exchange are both complete.</summary>
+    public bool EncryptionReady => Cipher is not null && HandshakeCompleted;
 
     public StarTruckMP.Shared.Vector3 PlayerPosition { get; set; }
     public StarTruckMP.Shared.Quaternion PlayerRotation { get; set; }

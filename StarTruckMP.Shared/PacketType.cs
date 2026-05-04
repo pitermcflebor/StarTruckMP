@@ -13,6 +13,7 @@
         ProtocolMismatch,
         ProtocolAuthenticate,
         UpdateTrailer,
-        Voice
+        Voice,
+        EncryptedPayload
     }
 }

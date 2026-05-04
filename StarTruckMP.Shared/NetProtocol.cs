@@ -2,7 +2,7 @@
 
 public static class NetProtocol
 {
-    public const ushort MinSupportedVersion = 1;
-    public const ushort CurrentVersion = 1;
+    public const ushort MinSupportedVersion = 2;
+    public const ushort CurrentVersion = 2;
 }
 

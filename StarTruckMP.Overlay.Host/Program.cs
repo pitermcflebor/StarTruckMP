@@ -35,7 +35,24 @@ internal static class Program
         if (!int.TryParse(args[1], out var processId))
             throw new ArgumentException($"Invalid PID: '{args[1]}'");
 
-        return new LaunchOptions(new IntPtr(hwndValue), processId);
+        return new LaunchOptions(new IntPtr(hwndValue), processId, ParseIgnoreCertificateErrors(args));
+    }
+
+    private static bool ParseIgnoreCertificateErrors(string[] args)
+    {
+        foreach (var arg in args.Skip(2))
+        {
+            if (arg.Equals("--ignore-certificate-errors", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (!arg.StartsWith("--ignore-certificate-errors=", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var value = arg[("--ignore-certificate-errors=".Length)..].Trim();
+            return value is "1" or "true" or "TRUE" or "True";
+        }
+
+        return false;
     }
 }
 

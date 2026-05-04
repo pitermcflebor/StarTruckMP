@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using BepInEx.Logging;
 using Il2CppInterop.Runtime.InteropTypes.Arrays;
+using StarTruckMP.Client.Http;
 using StarTruckMP.Shared.Cmd.Api;
 using StarTruckMP.Shared.Dto.Api;
 using StarTruckMP.Client.UI;
@@ -20,7 +21,6 @@ namespace StarTruckMP.Client.Authentication;
 internal static class SteamAuthHelper
 {
     private static ManualLogSource Log => Plugin.Log;
-    private static readonly HttpClient Http = new();
 
     /// <summary>
     /// Initialises Steam and obtains an auth ticket, then posts it to the server.
@@ -97,7 +97,7 @@ internal static class SteamAuthHelper
     /// </summary>
     private static void Send(ulong steamId, string ticketHex)
     {
-        var url = $"http://{App.ServerAddress.Value}:{App.ServerPort.Value}/api/auth/steam";
+        var url = $"https://{App.ServerAddress.Value}:{App.ServerPort.Value}/api/auth/steam";
         try
         {
             var cmd = new SteamAuthCmd
@@ -109,7 +109,7 @@ internal static class SteamAuthHelper
             using var content = new StringContent(JsonSerializer.Serialize(cmd), Encoding.UTF8, "application/json");
             using var request = new HttpRequestMessage(HttpMethod.Post, url);
             request.Content = content;
-            using var response = Http.Send(request);
+            using var response = HttpFactory.Create().Send(request);
 
             Log.LogInfo("[Auth] Steam server responded " + (int)response.StatusCode);
             if (response.StatusCode != HttpStatusCode.OK)
@@ -139,10 +139,27 @@ internal static class SteamAuthHelper
             if (body.Token == null) return;
             
             PlayerState.Token = body.Token;
+
+            if (!string.IsNullOrEmpty(body.ServerPublicKey))
+            {
+                try
+                {
+                    PlayerState.ServerPublicKey = Convert.FromBase64String(body.ServerPublicKey);
+                    App.Log.LogInfo("[Auth] Steam - server public key stored for ECDH.");
+                }
+                catch (Exception ex)
+                {
+                    App.Log.LogError("[Auth] Steam - failed to decode server public key: " + ex.Message);
+                }
+            }
+            else
+            {
+                App.Log.LogWarning("[Auth] Steam - server did not return a public key; UDP encryption will not be established.");
+            }
             
             OverlayManager.SetSessionTokenAndNavigate(
                 body.Token,
-                $"http://{App.ServerAddress.Value}:{App.ServerPort.Value}/overlay");
+                $"https://{App.ServerAddress.Value}:{App.ServerPort.Value}/overlay");
         }
         catch (Exception ex)
         {

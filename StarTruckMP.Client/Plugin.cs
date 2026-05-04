@@ -14,6 +14,7 @@ using Il2CppInterop.Runtime;
 using Il2CppInterop.Runtime.Injection;
 using StarTruckMP.Client.Authentication;
 using StarTruckMP.Client.Components;
+using StarTruckMP.Client.Http;
 using StarTruckMP.Client.Patches;
 using StarTruckMP.Client.Synchronization;
 using StarTruckMP.Client.UI;
@@ -29,8 +30,6 @@ public class Plugin : BasePlugin
 
     /// <summary>Global access to the Xbox auth manager. Available after Load().</summary>
     private static XboxAuthManager XboxAuth => GdkTickerComponent.AuthManager;
-
-    private static readonly HttpClient Http = new();
 
     public override void Load()
     {
@@ -150,7 +149,7 @@ public class Plugin : BasePlugin
     /// </summary>
     private static void SendXboxAuth(ulong xuid, string gamertag, string xblToken)
     {
-        var url = $"http://{App.ServerAddress.Value}:{App.ServerPort.Value}/api/auth/xbox";
+        var url = $"https://{App.ServerAddress.Value}:{App.ServerPort.Value}/api/auth/xbox";
         try
         {
             var cmd = new XboxAuthCmd
@@ -163,7 +162,7 @@ public class Plugin : BasePlugin
             using var content = new StringContent(JsonSerializer.Serialize(cmd), Encoding.UTF8, "application/json");
             using var request = new HttpRequestMessage(HttpMethod.Post, url);
             request.Content = content;
-            using var response = Http.Send(request);
+            using var response = HttpFactory.Create().Send(request);
 
             Log.LogInfo("[Auth] Server responded " + (int)response.StatusCode);
             if (response.StatusCode != HttpStatusCode.OK)
@@ -181,10 +180,27 @@ public class Plugin : BasePlugin
 
             if (body?.Token == null) return;
             PlayerState.Token = body.Token;
-            
+
+            if (!string.IsNullOrEmpty(body.ServerPublicKey))
+            {
+                try
+                {
+                    PlayerState.ServerPublicKey = Convert.FromBase64String(body.ServerPublicKey);
+                    App.Log.LogInfo("[Auth] Xbox - server public key stored for ECDH.");
+                }
+                catch (Exception ex)
+                {
+                    App.Log.LogError("[Auth] Xbox - failed to decode server public key: " + ex.Message);
+                }
+            }
+            else
+            {
+                App.Log.LogWarning("[Auth] Xbox - server did not return a public key; UDP encryption will not be established.");
+            }
+
             OverlayManager.SetSessionTokenAndNavigate(
                 body.Token,
-                $"http://{App.ServerAddress.Value}:{App.ServerPort.Value}/overlay");
+                $"https://{App.ServerAddress.Value}:{App.ServerPort.Value}/overlay");
         }
         catch (Exception ex)
         {

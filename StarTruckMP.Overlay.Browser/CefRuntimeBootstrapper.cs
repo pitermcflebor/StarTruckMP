@@ -9,6 +9,7 @@ public static class CefRuntimeBootstrapper
 {
     private static readonly object SyncRoot = new();
     private static bool _initialized;
+    public static bool IgnoreCertificateErrorsByDefault { get; set; }
 
     public static void InitializeOnce(IOverlayLogger logger)
     {
@@ -21,6 +22,7 @@ public static class CefRuntimeBootstrapper
             }
 
             var baseDirectory = AppContext.BaseDirectory;
+            var ignoreCertificateErrors = IgnoreCertificateErrorsByDefault;
             var settings = new CefSettings
             {
                 WindowlessRenderingEnabled = true,
@@ -31,6 +33,8 @@ public static class CefRuntimeBootstrapper
 
             settings.CefCommandLineArgs["disable-gpu-vsync"] = "1";
             settings.CefCommandLineArgs["autoplay-policy"] = "no-user-gesture-required";
+            if (ignoreCertificateErrors)
+                settings.CefCommandLineArgs["ignore-certificate-errors"] = "1";
 
             var subProcessCandidates = new[]
             {
@@ -49,6 +53,7 @@ public static class CefRuntimeBootstrapper
 
             logger.Info($"[CEF] Initializing runtime from {baseDirectory}");
             logger.Info($"[CEF] BrowserSubprocessPath={settings.BrowserSubprocessPath ?? "<default>"}");
+            logger.Info($"[CEF] IgnoreCertificateErrors={ignoreCertificateErrors}");
 
             var ok = Cef.Initialize(settings, performDependencyCheck: true, browserProcessHandler: null);
             if (!ok)

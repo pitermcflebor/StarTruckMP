@@ -11,6 +11,13 @@ public static class PlayerState
     /// </summary>
     public static string Token { get; set; } = "";
 
+    /// <summary>
+    /// Server ephemeral P-256 public key (SubjectPublicKeyInfo DER bytes) received during HTTPS auth.
+    /// Used by the client to derive the shared ChaCha20-Poly1305 session key via ECDH + HKDF.
+    /// Cleared after the session key is derived.
+    /// </summary>
+    public static byte[]? ServerPublicKey { get; set; }
+
     #region Game State
 
     public static string Sector { get; set; } = "";

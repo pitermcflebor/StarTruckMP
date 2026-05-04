@@ -1,9 +1,11 @@
 ﻿using System.Net;
 using System.Net.Sockets;
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using LiteNetLib;
 using Microsoft.Extensions.Logging;
 using StarTruckMP.Server.Controllers.Services;
+using StarTruckMP.Server.Crypto;
 using StarTruckMP.Server.Entities;
 using StarTruckMP.Server.Server.Services;
 using StarTruckMP.Shared;
@@ -15,7 +17,7 @@ namespace StarTruckMP.Server.Server;
 public class ServerManager
 {
     private const byte ReliableChannel = 0;
-    private const byte VoiceChannel = 0;  // Must match client. LiteNetLib default ChannelsCount=1 (only ch.0).
+    private const byte VoiceChannel = 0;
     private const int MaxIncomingPacketsPerTick = 256;
     private const int MaxOutgoingPacketsPerTick = 512;
 
@@ -25,14 +27,16 @@ public class ServerManager
     private readonly ServerSettings _settings;
     private readonly PlayerContainer _playerContainer;
     private readonly AuthService _authService;
+    private readonly ServerKeyPair _serverKeyPair;
     private readonly ConcurrentQueue<IncomingPacketWorkItem> _incomingPackets = new();
     private readonly ConcurrentQueue<OutgoingSendWorkItem> _outgoingPackets = new();
 
     private readonly record struct IncomingPacketWorkItem(int PeerId, PacketType PacketType, byte[] Raw, byte Channel, DeliveryMethod DeliveryMethod);
 
-    private readonly record struct OutgoingSendWorkItem(byte[] Payload, byte Channel, DeliveryMethod DeliveryMethod, int? TargetPeerId = null, int? ExceptPeerId = null, bool DisconnectTarget = false);
+    /// <param name="IsPlaintext">When true the payload is sent as-is (before encryption is established, or for handshake packets).</param>
+    private readonly record struct OutgoingSendWorkItem(byte[] Payload, byte Channel, DeliveryMethod DeliveryMethod, int? TargetPeerId = null, int? ExceptPeerId = null, bool DisconnectTarget = false, bool IsPlaintext = false);
 
-    public ServerManager(ILogger<ServerManager> logger, ServerSettings settings, PlayerContainer playerContainer, AuthService authService)
+    public ServerManager(ILogger<ServerManager> logger, ServerSettings settings, PlayerContainer playerContainer, AuthService authService, ServerKeyPair serverKeyPair)
     {
         _listener = new EventBasedNetListener();
         _server = new NetManager(_listener);
@@ -40,37 +44,30 @@ public class ServerManager
         _settings = settings;
         _playerContainer = playerContainer;
         _authService = authService;
+        _serverKeyPair = serverKeyPair;
 
         _listener.ConnectionRequestEvent += ListenerOnConnectionRequestEvent;
-        
         _listener.NetworkReceiveEvent += ListenerOnNetworkReceiveEvent;
         _listener.NetworkErrorEvent += ListenerOnNetworkErrorEvent;
         _listener.NetworkLatencyUpdateEvent += ListenerOnNetworkLatencyUpdateEvent;
         _listener.NetworkReceiveUnconnectedEvent += ListenerOnNetworkReceiveUnconnectedEvent;
-        
         _listener.PeerConnectedEvent += ListenerOnPeerConnectedEvent;
         _listener.PeerAddressChangedEvent += ListenerOnPeerAddressChangedEvent;
         _listener.PeerDisconnectedEvent += ListenerOnPeerDisconnectedEvent;
-        
         _listener.DeliveryEvent += ListenerOnDeliveryEvent;
     }
 
     #region Net Events
 
     #region Network
-    
+
     private void ListenerOnNetworkReceiveUnconnectedEvent(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
     {
         if (_logger.IsEnabled(LogLevel.Trace))
             _logger.LogTrace("Received unconnected message from {EndPoint}, type: {MessageType}", remoteEndPoint, messageType);
     }
 
-    private void ListenerOnNetworkLatencyUpdateEvent(NetPeer peer, int latency)
-    {
-        // TODO: really needed?
-        /*if (_logger.IsEnabled(LogLevel.Trace))
-            _logger.LogTrace("Peer {PeerId} latency updated: {Latency} ms", peer.Id, latency);*/
-    }
+    private void ListenerOnNetworkLatencyUpdateEvent(NetPeer peer, int latency) { }
 
     private void ListenerOnNetworkErrorEvent(IPEndPoint endPoint, SocketError socketError)
     {
@@ -82,7 +79,41 @@ public class ServerManager
     {
         try
         {
-            var packetType = (PacketType)reader.GetByte();
+            var firstByte = reader.GetByte();
+            var packetType = (PacketType)firstByte;
+
+            // Encrypted payload: decrypt before enqueuing
+            if (packetType == PacketType.EncryptedPayload)
+            {
+                if (!_playerContainer.TryGetPlayer(peer.Id, out var player) || player?.Cipher is null)
+                {
+                    if (_logger.IsEnabled(LogLevel.Warning))
+                        _logger.LogWarning("Received EncryptedPayload from peer {PeerId} before cipher is ready — dropping.", peer.Id);
+                    return;
+                }
+
+                var encryptedFrame = reader.GetRemainingBytes();
+                byte[] plaintext;
+                try
+                {
+                    plaintext = player.Cipher.Decrypt(encryptedFrame);
+                }
+                catch (CryptographicException ex)
+                {
+                    if (_logger.IsEnabled(LogLevel.Warning))
+                        _logger.LogWarning("Decryption failed for peer {PeerId}: {Message}", peer.Id, ex.Message);
+                    return;
+                }
+
+                // plaintext = [1-byte real PacketType][body...]
+                if (plaintext.Length < 1) return;
+                var realPacketType = (PacketType)plaintext[0];
+                var body = plaintext[1..];
+                _incomingPackets.Enqueue(new IncomingPacketWorkItem(peer.Id, realPacketType, body, channel, deliveryMethod));
+                return;
+            }
+
+            // Plaintext path (only ProtocolHello and connection-level packets before cipher is ready)
             var raw = reader.GetRemainingBytes();
             _incomingPackets.Enqueue(new IncomingPacketWorkItem(peer.Id, packetType, raw, channel, deliveryMethod));
         }
@@ -91,17 +122,19 @@ public class ServerManager
             reader.Recycle();
         }
     }
-    
+
     #endregion
 
     #region Peer
-    
+
     private void ListenerOnPeerDisconnectedEvent(NetPeer peer, DisconnectInfo disconnectInfo)
     {
         if (_logger.IsEnabled(LogLevel.Information))
             _logger.LogInformation("Peer {PeerId} disconnected from {EndPoint}, reason: {Reason}", peer.Id, peer.Address, disconnectInfo.Reason);
 
         _playerContainer.RemovePlayer(peer.Id, out var removedPlayer);
+        removedPlayer?.Cipher?.Dispose();
+
         if (removedPlayer is not { HandshakeCompleted: true })
             return;
 
@@ -114,7 +147,7 @@ public class ServerManager
         if (_logger.IsEnabled(LogLevel.Trace))
             _logger.LogTrace("Peer {PeerId} changed address from {PreviousAddress} to {CurrentAddress}", peer.Id, previousAddress, peer.Address);
     }
-    
+
     private void ListenerOnPeerConnectedEvent(NetPeer peer)
     {
         if (_logger.IsEnabled(LogLevel.Information))
@@ -122,46 +155,44 @@ public class ServerManager
 
         _playerContainer.RegisterPlayer(peer.Id);
     }
-    
+
     #endregion
 
     #region Other
-    
+
     private void ListenerOnDeliveryEvent(NetPeer peer, object userData)
     {
         if (_logger.IsEnabled(LogLevel.Trace))
             _logger.LogTrace("Delivered data to peer {PeerId}", peer.Id);
     }
-    
+
     private void ListenerOnConnectionRequestEvent(ConnectionRequest request)
     {
-        if (_logger.IsEnabled(LogLevel.Debug)) 
+        if (_logger.IsEnabled(LogLevel.Debug))
             _logger.LogDebug("Connection request from {EndPoint}", request.RemoteEndPoint);
 
         var raw = request.Data.GetRemainingBytesSpan();
         if (!PacketSerializer.TrySplitPacket<ProtocolAuthenticateCmd>(raw, out var packetType, out var authenticate))
         {
-            // We need to notify the rejection?
             request.RejectForce();
             _logger.LogWarning("Rejected connection from {EndPoint} due to invalid initial packet!", request.RemoteEndPoint);
             return;
         }
-        
-        // Validate token
-        if (packetType != PacketType.ProtocolAuthenticate || 
+
+        if (packetType != PacketType.ProtocolAuthenticate ||
             !_authService.IsTokenValid(authenticate.Token))
         {
             request.Reject();
             _logger.LogWarning("Rejected connection from {EndPoint} due to invalid token: {token}.", request.RemoteEndPoint, authenticate.Token);
             return;
         }
-        
+
         var peer = request.Accept();
 
         if (_logger.IsEnabled(LogLevel.Trace))
             _logger.LogTrace("Accepted connection, peer {peerId}", peer.Id);
     }
-    
+
     #endregion
 
     #endregion
@@ -172,7 +203,7 @@ public class ServerManager
         if (_logger.IsEnabled(LogLevel.Information))
             _logger.LogInformation("Server started on port {Port}", _settings.Port);
     }
-    
+
     public void Polling()
     {
         _server.PollEvents();
@@ -239,8 +270,6 @@ public class ServerManager
 
     private void HandleVoice(int packetPeerId, Player player, byte[] packetRaw)
     {
-        // Wrap raw Opus bytes with sender's NetId so each receiver knows who is speaking.
-        // Use Unreliable delivery: voice must not block on retransmissions; late/lost frames are simply skipped.
         var dto = new VoiceDto { NetId = packetPeerId, OpusData = packetRaw };
         QueueSendToAllExcept(dto.Serialize(PacketType.Voice), packetPeerId, VoiceChannel, DeliveryMethod.Unreliable);
     }
@@ -255,7 +284,13 @@ public class ServerManager
                 var targetPeer = _server.GetPeerById(send.TargetPeerId.Value);
                 if (targetPeer is not null)
                 {
-                    targetPeer.Send(send.Payload, send.DeliveryMethod);
+                    var wirePayload = send.IsPlaintext
+                        ? send.Payload
+                        : TryEncryptForPeer(send.TargetPeerId.Value, send.Payload);
+
+                    if (wirePayload is not null)
+                        targetPeer.Send(wirePayload, send.DeliveryMethod);
+
                     if (send.DisconnectTarget)
                         targetPeer.Disconnect();
                 }
@@ -264,21 +299,50 @@ public class ServerManager
                 continue;
             }
 
-            var exceptPeer = send.ExceptPeerId.HasValue ? _server.GetPeerById(send.ExceptPeerId.Value) : null;
-            _server.SendToAll(send.Payload, send.Channel, send.DeliveryMethod, exceptPeer);
+            // Broadcast-except: iterate known players and encrypt individually.
+            var knownPlayers = _playerContainer.SnapshotPlayers();
+            foreach (var knownPlayer in knownPlayers)
+            {
+                if (send.ExceptPeerId.HasValue && knownPlayer.Id == send.ExceptPeerId.Value)
+                    continue;
+
+                var peer = _server.GetPeerById(knownPlayer.Id);
+                if (peer is null) continue;
+
+                var wirePayload = send.IsPlaintext
+                    ? send.Payload
+                    : TryEncryptForPeer(knownPlayer.Id, send.Payload);
+
+                if (wirePayload is not null)
+                    peer.Send(wirePayload, send.DeliveryMethod);
+            }
+
             processed++;
         }
     }
 
+    /// <summary>
+    /// Wraps <paramref name="plainPayload"/> in an EncryptedPayload frame for the given peer.
+    /// Returns null if the peer has no cipher yet (skips sending silently).
+    /// </summary>
+    private byte[]? TryEncryptForPeer(int peerId, byte[] plainPayload)
+    {
+        if (!_playerContainer.TryGetPlayer(peerId, out var player) || player?.Cipher is null)
+            return null;
+
+        var encrypted = player.Cipher.Encrypt(plainPayload);
+
+        // Frame: [1-byte PacketType.EncryptedPayload][encrypted frame]
+        var frame = new byte[1 + encrypted.Length];
+        frame[0] = (byte)PacketType.EncryptedPayload;
+        encrypted.CopyTo(frame, 1);
+        return frame;
+    }
+
     private void ClearQueues()
     {
-        while (_incomingPackets.TryDequeue(out _))
-        {
-        }
-
-        while (_outgoingPackets.TryDequeue(out _))
-        {
-        }
+        while (_incomingPackets.TryDequeue(out _)) { }
+        while (_outgoingPackets.TryDequeue(out _)) { }
     }
 
     private static PlayerSnapshotDto ToSnapshot(Player player)
@@ -320,23 +384,45 @@ public class ServerManager
                 ServerVersion = NetProtocol.CurrentVersion
             };
 
-            QueueSendToPeer(mismatch.Serialize(PacketType.ProtocolMismatch), peerId, ReliableChannel, DeliveryMethod.ReliableOrdered, disconnectAfterSend: true);
+            // ProtocolMismatch is sent before the cipher exists — always plaintext.
+            QueueSendToPeer(mismatch.Serialize(PacketType.ProtocolMismatch), peerId, ReliableChannel, DeliveryMethod.ReliableOrdered, disconnectAfterSend: true, plaintext: true);
             return;
         }
 
         if (player.HandshakeCompleted)
             return;
 
+        // ECDH key exchange
+        if (hello.ClientPublicKey is not { Length: > 0 })
+        {
+            _logger.LogWarning("Peer {PeerId} sent ProtocolHello without a ClientPublicKey — rejecting.", peerId);
+            _server.GetPeerById(peerId)?.Disconnect();
+            return;
+        }
+
+        try
+        {
+            var sessionKey = _serverKeyPair.DeriveSessionKey(hello.ClientPublicKey);
+            player.Cipher = new SessionCipher(sessionKey);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("ECDH key derivation failed for peer {PeerId}: {Message}", peerId, ex.Message);
+            _server.GetPeerById(peerId)?.Disconnect();
+            return;
+        }
+
         player.HandshakeCompleted = true;
         player.ProtocolVersion = hello.ProtocolVersion;
 
+        // ProtocolWelcome is sent in plaintext - the client will use its own local key derivation.
+        // From this point on all other packets are encrypted.
         var welcome = new ProtocolWelcomeDto
         {
             NetId = peerId,
             ProtocolVersion = NetProtocol.CurrentVersion
         };
-
-        QueueSendToPeer(welcome.Serialize(PacketType.ProtocolWelcome), peerId, ReliableChannel, DeliveryMethod.ReliableOrdered);
+        QueueSendToPeer(welcome.Serialize(PacketType.ProtocolWelcome), peerId, ReliableChannel, DeliveryMethod.ReliableOrdered, plaintext: true);
 
         var existingPlayers = _playerContainer
             .SnapshotPlayers()
@@ -407,13 +493,13 @@ public class ServerManager
     }
 
     private void HandleUpdateSector(int peerId, Player player, byte[] raw)
-    { 
+    {
         var sectorData = PacketSerializer.Deserialize<UpdateSectorCmd>(raw);
         player.Sector = string.IsNullOrWhiteSpace(sectorData.Sector) ? "none" : sectorData.Sector;
-        
+
         var update = new UpdateSectorDto { NetId = peerId, Sector = player.Sector };
         QueueSendReliableToAllExcept(update.Serialize(PacketType.UpdateSector), peerId);
-        
+
         if (_logger.IsEnabled(LogLevel.Trace))
             _logger.LogTrace("Peer {peerId} updated sector to '{sector}'", peerId, sectorData.Sector);
     }
@@ -425,11 +511,11 @@ public class ServerManager
 
         var update = new UpdateLiveryDto { NetId = peerId, Livery = player.Livery };
         QueueSendReliableToAllExcept(update.Serialize(PacketType.UpdateLivery), peerId);
-        
+
         if (_logger.IsEnabled(LogLevel.Trace))
             _logger.LogTrace("Peer {peerId} updated livery to '{livery}'", peerId, liveryData.Livery);
     }
-    
+
     private void HandleUpdateTrailer(int packetPeerId, Player player, byte[] packetRaw)
     {
         var trailerData = PacketSerializer.Deserialize<UpdateTrailerCmd>(packetRaw);
@@ -445,7 +531,7 @@ public class ServerManager
             CargoTypeId = trailerData.CargoTypeId
         };
         QueueSendReliableToAllExcept(update.Serialize(PacketType.UpdateTrailer), packetPeerId);
-        
+
         if (_logger.IsEnabled(LogLevel.Trace))
             _logger.LogTrace("Peer {peerId} updated trailer, count {count} with livery {livery}", packetPeerId, trailerData.TrailerCount, trailerData.LiveryId);
     }
@@ -455,9 +541,9 @@ public class ServerManager
         QueueSendToAllExcept(payload, exceptPeerId, ReliableChannel, DeliveryMethod.ReliableOrdered);
     }
 
-    private void QueueSendToPeer(byte[] payload, int targetPeerId, byte channel, DeliveryMethod deliveryMethod, bool disconnectAfterSend = false)
+    private void QueueSendToPeer(byte[] payload, int targetPeerId, byte channel, DeliveryMethod deliveryMethod, bool disconnectAfterSend = false, bool plaintext = false)
     {
-        _outgoingPackets.Enqueue(new OutgoingSendWorkItem(payload, channel, deliveryMethod, TargetPeerId: targetPeerId, DisconnectTarget: disconnectAfterSend));
+        _outgoingPackets.Enqueue(new OutgoingSendWorkItem(payload, channel, deliveryMethod, TargetPeerId: targetPeerId, DisconnectTarget: disconnectAfterSend, IsPlaintext: plaintext));
     }
 
     private void QueueSendToAllExcept(byte[] payload, int exceptPeerId, byte channel, DeliveryMethod deliveryMethod)

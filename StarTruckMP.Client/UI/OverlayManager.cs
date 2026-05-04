@@ -76,11 +76,12 @@ internal static class OverlayManager
 
             var hwnd = WaitForGameWindow(timeoutMs: 30_000);
             var pid  = Process.GetCurrentProcess().Id;
-            App.Log.LogInfo($"[Overlay] Game HWND={hwnd}, PID={pid}");
+            var ignoreSslValidation = App.IgnoreSslValidation.Value;
+            App.Log.LogInfo($"[Overlay] Game HWND={hwnd}, PID={pid}, IgnoreSslValidation={ignoreSslValidation}");
 
             // Pass HWND and PID so the overlay can track the game window and
             // automatically exit when the game process terminates.
-            var psi = new ProcessStartInfo(exe, $"{hwnd.ToInt64()} {pid}")
+            var psi = new ProcessStartInfo(exe, $"{hwnd.ToInt64()} {pid} --ignore-certificate-errors={(ignoreSslValidation ? "1" : "0")}")
             {
                 UseShellExecute = false,
                 RedirectStandardError  = true,

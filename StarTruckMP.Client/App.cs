@@ -11,6 +11,7 @@ public static class App
     public static ConfigEntry<string> MicrophoneDeviceName;
     public static ConfigEntry<bool> PreferSystemDefaultMicrophone;
     public static ConfigEntry<float> RadioEffectOutputGain;
+    public static ConfigEntry<bool> IgnoreSslValidation;
 
     public static void Configure(ConfigFile config)
     {
@@ -19,6 +20,7 @@ public static class App
         MicrophoneDeviceName = config.Bind("Audio", "MicrophoneDeviceName", string.Empty, "Exact microphone device name to use. Leave empty to auto-select.");
         PreferSystemDefaultMicrophone = config.Bind("Audio", "PreferSystemDefaultMicrophone", true, "When auto-selecting, try the Windows default microphone before explicit devices.");
         RadioEffectOutputGain = config.Bind("Audio", "RadioEffectOutputGain", 1.0f, "Final output gain applied after the NWaves radio voice effect.");
+        IgnoreSslValidation = config.Bind("Connection", "IgnoreSslValidation", false, "Whether to ignore SSL certificate validation errors. Not recommended for production use.");
     }
 
     public static ManualLogSource Log;

@@ -38,6 +38,7 @@ internal sealed class OverlayApp : Application
             _logger = new ConsoleOverlayLogger();
             _logger.Info($"[App] Launching overlay. GameHwnd=0x{_launchOptions.GameWindowHandle:X}, GamePid={_launchOptions.GameProcessId}");
 
+            CefRuntimeBootstrapper.IgnoreCertificateErrorsByDefault = _launchOptions.IgnoreCertificateErrors;
             CefRuntimeBootstrapper.InitializeOnce(_logger);
 
             var window = new OverlayWindow();
